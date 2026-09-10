@@ -1,0 +1,48 @@
+# Learn more https://docs.github.com/en/get-started/getting-started-with-git/ignoring-files
+
+# dependencies
+node_modules/
+
+# Expo
+.expo/
+dist/
+web-build/
+expo-env.d.ts
+
+# Native
+.kotlin/
+*.orig.*
+*.jks
+*.p8
+*.p12
+*.key
+*.mobileprovision
+
+# Metro
+.metro-health-check*
+
+# debug
+npm-debug.*
+yarn-debug.*
+yarn-error.*
+
+# macOS
+.DS_Store
+*.pem
+
+# local env files
+.env*.local
+
+# typescript
+*.tsbuildinfo
+
+# generated native folders
+/ios
+/android
+
+# Unlicensed / scratch assets kept out of the public repo
+# onboarding.mp3 has no licence documentation and is no longer referenced by
+# the app (the onboarding music system was removed). Publishing a music file
+# of unknown provenance to a public repo is a risk that buys us nothing.
+assets/audio/onboarding.mp3
+assets/_icon-backup/
