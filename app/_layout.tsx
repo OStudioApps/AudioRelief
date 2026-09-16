@@ -11,6 +11,7 @@ import {
   Manrope_600SemiBold,
   Manrope_700Bold,
 } from '@expo-google-fonts/manrope';
+import { AuthProvider } from '../src/auth';
 import { PlayerProvider } from '../src/state';
 import { SoundEngine } from '../src/audio/engine';
 import { TinnitusProvider } from '../src/tinnitus';
@@ -33,6 +34,7 @@ export default function RootLayout() {
 
   return (
     <SafeAreaProvider>
+      <AuthProvider>
       <PlayerProvider>
         {/* Inside the provider so it can read player state, but rendered
             from here rather than from state.tsx — that import was what made
@@ -60,6 +62,7 @@ export default function RootLayout() {
         </SampleProvider>
         </TinnitusProvider>
       </PlayerProvider>
+      </AuthProvider>
     </SafeAreaProvider>
   );
 }

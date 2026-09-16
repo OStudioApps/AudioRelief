@@ -46,3 +46,6 @@ yarn-error.*
 # of unknown provenance to a public repo is a risk that buys us nothing.
 assets/audio/onboarding.mp3
 assets/_icon-backup/
+
+# local env
+.env
