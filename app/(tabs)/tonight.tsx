@@ -9,7 +9,7 @@ import { Icon } from '../../src/components/Icon';
 import { FadeIn, PressScale } from '../../src/components/Motion';
 import { usePlayer } from '../../src/state';
 import { useTinnitus } from '../../src/tinnitus';
-import { MIXES, MIX_ART, NOISES, soundById } from '../../src/data/sounds';
+import { artFor, MIXES, MIX_ART, NOISES, soundById } from '../../src/data/sounds';
 import {
   alternativeTo,
   CHECKIN_DAYS,
@@ -108,7 +108,7 @@ function DayDots({ elapsed }: { elapsed: number }) {
  * way the worst case is a stale image lingering for a moment, and a timer
  * clears even that.
  *
- * Noises have no artwork, so the card falls back to its plain glass.
+ * Anything without artwork falls back to the card's plain glass.
  */
 function NowPlayingBackdrop({ source }: { source: number | null }) {
   const [layers, setLayers] = useState<{ current: number | null; leaving: number | null }>({
@@ -238,9 +238,10 @@ export default function Home() {
   const dueForCheckin = checkinDue(tin.daysSinceImpact);
   const [open, setOpen] = useState(false);
 
-  // Only mixes carry artwork; the colour noises are generated and have none.
-  const nowPlayingArt =
-    p.selection.kind === 'mix' ? (MIX_ART[p.selection.id]?.image ?? null) : null;
+  // Every sound has artwork now — mixes, library sounds and the noises —
+  // so whatever is selected, from home or from the Sounds tab, shows here.
+  // artId, not the selection: a saved mix shows its first sound's photograph.
+  const nowPlayingArt = artFor(p.artId);
 
   const startNoise = (id: string) => {
     p.select({ kind: 'noise', id });

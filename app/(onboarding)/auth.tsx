@@ -1,7 +1,7 @@
 import React, { useRef, useState } from 'react';
-import { Animated, ScrollView, Text, View } from 'react-native';
+import { Animated, KeyboardAvoidingView, Platform, ScrollView, Text, TextInput, View } from 'react-native';
 import { PressScale, useToggleValue } from '../../src/components/Motion';
-import { useRouter } from 'expo-router';
+import { useLocalSearchParams, useRouter } from 'expo-router';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { Aurora } from '../../src/components/Aurora';
 import { AppleGlyph, GoogleGlyph } from '../../src/components/BrandIcons';
@@ -9,18 +9,63 @@ import { GlassCard, PrimaryButton, RoundButton, SecondaryButton } from '../../sr
 import { Icon } from '../../src/components/Icon';
 import { LegalModal } from '../../src/components/LegalModal';
 import { PRIVACY_POLICY, TERMS_OF_SERVICE } from '../../src/legal/content';
+import { useAccount } from '../../src/account';
 import { color, font, motion, radius, safe, type as t } from '../../src/theme';
 
-function Field({ icon, placeholder, trailing }: { icon: 'mail' | 'lock'; placeholder: string; trailing?: React.ReactNode }) {
+/**
+ * A real input now, not a picture of one. These were Text placeholders while
+ * the screen was a mockup, which meant the form could not be tried at all.
+ */
+function Field({
+  icon,
+  placeholder,
+  value,
+  onChangeText,
+  secure,
+  keyboard,
+  autoComplete,
+  trailing,
+}: {
+  icon: 'mail' | 'lock';
+  placeholder: string;
+  value: string;
+  onChangeText: (s: string) => void;
+  secure?: boolean;
+  keyboard?: 'email-address' | 'default';
+  autoComplete?: 'email' | 'password' | 'new-password';
+  trailing?: React.ReactNode;
+}) {
   return (
     <GlassCard
       r={radius.md}
       style={{ minHeight: 56, flexDirection: 'row', alignItems: 'center', gap: 12, paddingHorizontal: 16 }}
     >
       <Icon name={icon} size={19} color={color.ink58} />
-      <Text style={{ fontFamily: t.body.fontFamily, fontSize: 14.5, color: color.ink58, flex: 1 }}>
-        {placeholder}
-      </Text>
+      <TextInput
+        value={value}
+        onChangeText={onChangeText}
+        placeholder={placeholder}
+        placeholderTextColor={color.ink58}
+        secureTextEntry={secure}
+        keyboardType={keyboard ?? 'default'}
+        autoCapitalize="none"
+        autoCorrect={false}
+        autoComplete={autoComplete}
+        accessibilityLabel={placeholder}
+        style={{
+          flex: 1,
+          alignSelf: 'stretch',
+          fontFamily: t.body.fontFamily,
+          fontSize: 14.5,
+          color: color.ink,
+          // A static <input> paints under the card's absolutely positioned
+          // blur, which frosted the placeholder. Positioning it puts it back
+          // on top — the same fix SVG_LAYER applies to icons on glass.
+          position: 'relative',
+          // Removes the focus ring react-native-web draws on top of the glass.
+          outlineStyle: 'none',
+        } as never}
+      />
       {trailing}
     </GlassCard>
   );
@@ -29,7 +74,10 @@ function Field({ icon, placeholder, trailing }: { icon: 'mail' | 'lock'; placeho
 export default function Auth() {
   const router = useRouter();
   const insets = useSafeAreaInsets();
-  const [mode, setMode] = useState<'up' | 'in'>('up');
+  // Someone arriving from Sign out already has an account, so they land on
+  // Sign in rather than being asked to create one again.
+  const params = useLocalSearchParams<{ mode?: string }>();
+  const [mode, setMode] = useState<'up' | 'in'>(params.mode === 'in' ? 'in' : 'up');
   const [segW, setSegW] = useState(0);
   const up = mode === 'up';
   const slide = useToggleValue(!up, 260);
@@ -38,6 +86,32 @@ export default function Auth() {
     terms: false,
     privacy: false,
   });
+
+  const acct = useAccount();
+  const [email, setEmail] = useState('');
+  const [password, setPassword] = useState('');
+  const [reveal, setReveal] = useState(false);
+  const [error, setError] = useState<string | null>(null);
+
+  /*
+    Shape checks only. There is no server to ask whether this address exists or
+    whether the password is right, so this validates what a form can validate
+    on its own and nothing more — it must never look like it verified anything.
+  */
+  const submit = () => {
+    const mail = email.trim();
+    if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(mail)) {
+      setError('That does not look like an email address.');
+      return;
+    }
+    if (password.length < 6) {
+      setError('Passwords need at least 6 characters.');
+      return;
+    }
+    setError(null);
+    acct.signIn(mail);
+    router.replace('/(tabs)/tonight');
+  };
 
   return (
     <View style={{ flex: 1, backgroundColor: color.ground }}>
@@ -57,14 +131,32 @@ export default function Auth() {
         }}
       >
         <View style={{ flexDirection: 'row', alignItems: 'center' }}>
-          <RoundButton onPress={() => router.back()}>
+          {/*
+            After Sign out this screen replaced Account, so there is nothing
+            behind it and router.back() would do nothing — a dead button. The
+            app works fully without an account, so the way out goes home.
+          */}
+          <RoundButton
+            label="Back"
+            onPress={() => (router.canGoBack() ? router.back() : router.replace('/(tabs)/tonight'))}
+          >
             <Icon name="chevronLeft" />
           </RoundButton>
         </View>
 
         <View style={{ height: 24 }} />
 
-        <ScrollView style={{ flex: 1 }} showsVerticalScrollIndicator={false} contentContainerStyle={{ paddingBottom: 16 }}>
+        {/* The password field sits low enough that the keyboard covers it. */}
+        <KeyboardAvoidingView
+          style={{ flex: 1 }}
+          behavior={Platform.OS === 'ios' ? 'padding' : undefined}
+        >
+        <ScrollView
+          style={{ flex: 1 }}
+          showsVerticalScrollIndicator={false}
+          keyboardShouldPersistTaps="handled"
+          contentContainerStyle={{ paddingBottom: 16 }}
+        >
           <View style={{ gap: 10 }}>
             <Text style={[t.title, { color: color.ink }]}>
               {up ? 'Create your account' : 'Welcome back'}
@@ -140,13 +232,23 @@ export default function Auth() {
 
           <View style={{ height: 20 }} />
 
+          {/*
+            Neither of these can work without a server to hand the token to, so
+            they say so when tapped rather than doing nothing at all — a button
+            that swallows a tap silently reads as a broken app.
+          */}
           <View style={{ gap: 10 }}>
             <PrimaryButton
               label="Continue with Apple"
               tint="rgba(255,255,255,0.92)"
               left={<AppleGlyph size={22} color={color.onAccent} />}
+              onPress={() => setError('Apple and Google sign-in need a server. Use email for now.')}
             />
-            <SecondaryButton label="Continue with Google" left={<GoogleGlyph size={18} />} />
+            <SecondaryButton
+              label="Continue with Google"
+              left={<GoogleGlyph size={18} />}
+              onPress={() => setError('Apple and Google sign-in need a server. Use email for now.')}
+            />
           </View>
 
           <View style={{ height: 20 }} />
@@ -159,20 +261,57 @@ export default function Auth() {
 
           <View style={{ height: 20 }} />
 
-          <Field icon="mail" placeholder="Email address" />
+          <Field
+            icon="mail"
+            placeholder="Email address"
+            value={email}
+            onChangeText={(s) => {
+              setEmail(s);
+              if (error) setError(null);
+            }}
+            keyboard="email-address"
+            autoComplete="email"
+          />
           <View style={{ height: 12 }} />
           <Field
             icon="lock"
             placeholder={up ? 'Choose a password' : 'Password'}
-            trailing={<Icon name="eye" size={19} color={color.ink58} />}
+            value={password}
+            onChangeText={(s) => {
+              setPassword(s);
+              if (error) setError(null);
+            }}
+            secure={!reveal}
+            autoComplete={up ? 'new-password' : 'password'}
+            trailing={
+              <PressScale
+                onPress={() => setReveal((r) => !r)}
+                accessibilityRole="button"
+                accessibilityLabel={reveal ? 'Hide password' : 'Show password'}
+                // A full 44pt target around a 19pt glyph. The negative margin
+                // pulls it back to the field's edge so the bigger box does not
+                // push the glyph inward.
+                style={{
+                  width: 44,
+                  height: 44,
+                  marginRight: -12,
+                  alignItems: 'center',
+                  justifyContent: 'center',
+                }}
+              >
+                <Icon name={reveal ? 'eye' : 'eyeOff'} size={19} color={color.ink58} />
+              </PressScale>
+            }
           />
+
+          {/* Beside the fields it describes, not in a banner at the top. */}
+          {error ? (
+            <Text style={[t.meta, { color: color.scaleBad, marginTop: 8 }]}>{error}</Text>
+          ) : null}
 
           <View style={{ height: 20 }} />
 
-          <PrimaryButton
-            label={up ? 'Create account' : 'Sign in'}
-            onPress={() => router.replace('/(tabs)/tonight')}
-          />
+          <PrimaryButton label={up ? 'Create account' : 'Sign in'} onPress={submit} />
 
           <View style={{ height: 20 }} />
 
@@ -202,6 +341,7 @@ export default function Auth() {
             )}
           </View>
         </ScrollView>
+        </KeyboardAvoidingView>
       </View>
 
       <LegalModal

@@ -14,7 +14,11 @@ const ITEMS: Array<{ name: string; label: string; icon: IconName }> = [
   { name: 'tonight', label: 'Home', icon: 'home' },
   { name: 'sounds', label: 'Sounds', icon: 'waves' },
   { name: 'mix', label: 'Mix', icon: 'mixer' },
-  { name: 'sleep', label: 'Sleep', icon: 'zzz' },
+  // Night mode used to sit here. It is one screen you open for one night,
+  // not a place you navigate to — it lives at /sleep now, opened from
+  // Account. The fourth tab is the one thing every app needs a home for:
+  // the person's own profile, plan and settings.
+  { name: 'account', label: 'Account', icon: 'user' },
 ];
 
 type TabBarProps = {
@@ -40,6 +44,10 @@ function TabItem({
   return (
     <Pressable
       onPress={onPress}
+      accessibilityRole="tab"
+      accessibilityLabel={item.label}
+      // Which tab you are on is carried by colour alone otherwise.
+      accessibilityState={{ selected: focused }}
       style={{
         flex: 1,
         alignItems: 'center',
@@ -168,7 +176,7 @@ export default function TabsLayout() {
       <Tabs.Screen name="tonight" />
       <Tabs.Screen name="sounds" />
       <Tabs.Screen name="mix" />
-      <Tabs.Screen name="sleep" />
+      <Tabs.Screen name="account" />
     </Tabs>
   );
 }
