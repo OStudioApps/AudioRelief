@@ -10,7 +10,7 @@ import {
   View,
 } from 'react-native';
 import { PressScale, useToggleValue } from '../../src/components/Motion';
-import { useRouter } from 'expo-router';
+import { useLocalSearchParams, useRouter } from 'expo-router';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { Aurora } from '../../src/components/Aurora';
 import { AppleGlyph, GoogleGlyph } from '../../src/components/BrandIcons';
@@ -54,6 +54,7 @@ function Field({
         onChangeText={onChangeText}
         placeholder={placeholder}
         placeholderTextColor={color.ink58}
+        accessibilityLabel={placeholder}
         style={{
           flex: 1,
           fontFamily: t.body.fontFamily,
@@ -61,7 +62,10 @@ function Field({
           color: color.ink,
           // Android centres poorly without this and clips descenders.
           paddingVertical: Platform.OS === 'android' ? 10 : 0,
-        }}
+          // Web blur fix and focus ring removal
+          position: 'relative',
+          outlineStyle: 'none',
+        } as never}
         {...input}
       />
       {trailing}
@@ -74,7 +78,9 @@ export default function Auth() {
   const insets = useSafeAreaInsets();
   const { signIn, signUp, configured } = useAuth();
 
-  const [mode, setMode] = useState<'up' | 'in'>('up');
+  const params = useLocalSearchParams<{ mode?: string }>();
+  const [mode, setMode] = useState<'up' | 'in'>(params.mode === 'in' ? 'in' : 'up');
+
   const [segW, setSegW] = useState(0);
   const up = mode === 'up';
   const slide = useToggleValue(!up, 260);
@@ -160,7 +166,10 @@ export default function Auth() {
           }}
         >
           <View style={{ flexDirection: 'row', alignItems: 'center' }}>
-            <RoundButton onPress={() => router.back()}>
+            <RoundButton
+              label="Back"
+              onPress={() => (router.canGoBack() ? router.back() : router.replace('/(tabs)/tonight'))}
+            >
               <Icon name="chevronLeft" />
             </RoundButton>
           </View>
@@ -248,11 +257,7 @@ export default function Auth() {
 
             <View style={{ height: 20 }} />
 
-            {/*
-              Apple and Google are designed but not wired up. Shown dimmed and
-              inert rather than tappable-and-silent, so the screen does not
-              promise something it cannot do.
-            */}
+            {/* Apple and Google sign-in placeholders */}
             <View style={{ gap: 10, opacity: 0.38 }} pointerEvents="none">
               <PrimaryButton
                 label="Continue with Apple"
@@ -283,8 +288,7 @@ export default function Auth() {
                   <Text style={[t.card, { color: color.ink, fontSize: 14.5 }]}>Check your inbox</Text>
                 </View>
                 <Text style={[t.meta, { color: color.ink62, lineHeight: 18 }]}>
-                  We sent a confirmation link to {email.trim()}. Open it, then come back and sign
-                  in.
+                  We sent a confirmation link to {email.trim()}. Open it, then come back and sign in.
                 </Text>
                 <View style={{ height: 4 }} />
                 <PressScale onPress={() => switchMode('in')}>
@@ -299,7 +303,10 @@ export default function Auth() {
                   icon="mail"
                   placeholder="Email address"
                   value={email}
-                  onChangeText={setEmail}
+                  onChangeText={(s) => {
+                    setEmail(s);
+                    if (error) setError(null);
+                  }}
                   keyboardType="email-address"
                   autoCapitalize="none"
                   autoCorrect={false}
@@ -315,7 +322,10 @@ export default function Auth() {
                   icon="lock"
                   placeholder={up ? 'Choose a password' : 'Password'}
                   value={password}
-                  onChangeText={setPassword}
+                  onChangeText={(s) => {
+                    setPassword(s);
+                    if (error) setError(null);
+                  }}
                   secureTextEntry={!reveal}
                   autoCapitalize="none"
                   autoCorrect={false}
@@ -325,9 +335,21 @@ export default function Auth() {
                   editable={!busy}
                   onSubmitEditing={() => void submit()}
                   trailing={
-                    <PressScale onPress={() => setReveal((r) => !r)} hitSlop={10}>
+                    <PressScale
+                      onPress={() => setReveal((r) => !r)}
+                      hitSlop={10}
+                      accessibilityRole="button"
+                      accessibilityLabel={reveal ? 'Hide password' : 'Show password'}
+                      style={{
+                        width: 44,
+                        height: 44,
+                        marginRight: -12,
+                        alignItems: 'center',
+                        justifyContent: 'center',
+                      }}
+                    >
                       <Icon
-                        name="eye"
+                        name={reveal ? 'eye' : 'eyeOff'}
                         size={19}
                         color={reveal ? color.accent : color.ink58}
                       />
@@ -374,8 +396,8 @@ export default function Auth() {
                     style={{ color: accepted.terms ? color.accent : color.ink72, fontFamily: font.semibold }}
                   >
                     Terms of Service
-                  </Text>
-                  {' '}and{' '}
+                  </Text>{' '}
+                  and{' '}
                   <Text
                     onPress={() => setLegalDoc('privacy')}
                     style={{ color: accepted.privacy ? color.accent : color.ink72, fontFamily: font.semibold }}

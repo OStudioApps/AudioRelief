@@ -105,7 +105,9 @@ export function SoundEngine() {
         <Voice
           key={id}
           id={id}
-          gain={p.layerOn[id] === false ? 0 : gainFor(p.volume, p.layerVol[id] ?? 50)}
+          // The sleep timer's tail rides on top of the master volume, so the
+          // last minutes ease away without the slider appearing to move.
+          gain={p.layerOn[id] === false ? 0 : gainFor(p.volume * p.fadeGain, p.layerVol[id] ?? 50)}
           playing={allowed && p.playing}
         />
       ))}

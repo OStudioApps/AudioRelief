@@ -63,6 +63,34 @@ export const MIX_ART: Record<string, { image: number; icon: 'rain' | 'waves' | '
   fire: { image: require('../../assets/mixes/fire.jpg'), icon: 'fire' },
 };
 
+/**
+ * Background photograph for every sound in the library, keyed by sound id.
+ * Licence and sources: assets/sounds/README.md. Three reuse the mix art.
+ */
+export const SOUND_ART: Record<string, number> = {
+  'rain-roof': require('../../assets/mixes/rain.jpg'),
+  ocean: require('../../assets/mixes/ocean.jpg'),
+  forest: require('../../assets/mixes/forest.jpg'),
+  'rain-window': require('../../assets/sounds/rain-window.jpg'),
+  thunder: require('../../assets/sounds/thunder.jpg'),
+  'rain-forest': require('../../assets/sounds/rain-forest.jpg'),
+  stream: require('../../assets/sounds/stream.jpg'),
+  crickets: require('../../assets/sounds/crickets.jpg'),
+  fan: require('../../assets/sounds/fan.jpg'),
+  train: require('../../assets/sounds/train.jpg'),
+  ac: require('../../assets/sounds/ac.jpg'),
+  radiator: require('../../assets/sounds/radiator.jpg'),
+  white: require('../../assets/sounds/white.jpg'),
+  pink: require('../../assets/sounds/pink.jpg'),
+  brown: require('../../assets/sounds/brown.jpg'),
+  green: require('../../assets/sounds/green.jpg'),
+  hum: require('../../assets/sounds/hum.jpg'),
+};
+
+/** Art for anything the player can have selected — a mix or a library sound. */
+export const artFor = (id: string): number | null =>
+  MIX_ART[id]?.image ?? SOUND_ART[id] ?? null;
+
 export const MIXES: Mix[] = [
   { id: 'rain', name: 'Rain on a tin roof', sub: '3 layers · 45 min', fade: 'Fades out at 45 min', colors: c('rain') },
   { id: 'ocean', name: 'Deep ocean hum', sub: '3 layers · all night', fade: 'Plays until your alarm', colors: c('ocean') },
@@ -92,9 +120,103 @@ export const DEFAULT_LAYER_ON: Record<string, boolean> = {
 
 export const soundById = (id: string): Sound | undefined => SOUNDS.find((s) => s.id === id);
 
+/**
+ * Three lengths: a short reset, an evening, and most of a night.
+ *
+ * `seconds` is the real duration the player counts down, and `fadeSeconds` the
+ * tail it spends easing the volume to nothing. These used to be fixed strings
+ * ("Stops in 57:40") that never moved — the screen promised a timer the app did
+ * not have.
+ */
 export const TIMERS = [
-  { id: '15m', label: '15 min', stop: 'Stops in 14:12', pct: 0.06, fade: 'Fades over the last 3 min' },
-  { id: '45m', label: '45 min', stop: 'Stops in 42:18', pct: 0.06, fade: 'Fades over the last 5 min' },
-  { id: '2h', label: '2 hours', stop: 'Stops in 1:56:04', pct: 0.03, fade: 'Fades over the last 10 min' },
-  { id: 'all', label: 'All night', stop: 'Plays until your alarm', pct: 0.02, fade: 'No fade · stops at 6:40' },
+  { id: '15m', label: '15 min', seconds: 15 * 60, fadeSeconds: 3 * 60, fade: 'Fades over the last 3 min' },
+  { id: '1h', label: '1 hour', seconds: 60 * 60, fadeSeconds: 5 * 60, fade: 'Fades over the last 5 min' },
+  { id: '3h', label: '3 hours', seconds: 3 * 60 * 60, fadeSeconds: 10 * 60, fade: 'Fades over the last 10 min' },
 ] as const;
+
+/** m:ss under an hour, h:mm:ss over it. */
+export function formatDuration(totalSeconds: number): string {
+  const s = Math.max(0, Math.round(totalSeconds));
+  const h = Math.floor(s / 3600);
+  const m = Math.floor((s % 3600) / 60);
+  const sec = s % 60;
+  const pad = (n: number) => String(n).padStart(2, '0');
+  return h > 0 ? `${h}:${pad(m)}:${pad(sec)}` : `${m}:${pad(sec)}`;
+}
+
+/**
+ * Channels: different recordings of the same subject, so a forest can be
+ * birdsong one night and wind in the pines the next without leaving the
+ * sound.
+ *
+ * Only sounds with a real subject get them. The generated noises are one
+ * mathematically defined signal each, so there is nothing to vary and they
+ * get no channel row.
+ *
+ * None of these have audio yet — they describe the recordings to source.
+ * When one lands, register it in SOUND_ASSETS as `${soundId}:${channelId}`.
+ */
+export type Channel = { id: string; label: string };
+
+export const CHANNELS: Record<string, Channel[]> = {
+  rain: [
+    { id: 'steady', label: 'Steady' },
+    { id: 'heavy', label: 'Heavy' },
+    { id: 'eaves', label: 'Dripping eaves' },
+  ],
+  'rain-roof': [
+    { id: 'steady', label: 'Steady' },
+    { id: 'heavy', label: 'Heavy' },
+    { id: 'eaves', label: 'Dripping eaves' },
+  ],
+  'rain-window': [
+    { id: 'drizzle', label: 'Drizzle' },
+    { id: 'downpour', label: 'Downpour' },
+  ],
+  thunder: [
+    { id: 'far', label: 'Far off' },
+    { id: 'rolling', label: 'Rolling' },
+  ],
+  'rain-forest': [
+    { id: 'canopy', label: 'Canopy' },
+    { id: 'undergrowth', label: 'Undergrowth' },
+  ],
+  ocean: [
+    { id: 'swell', label: 'Swell' },
+    { id: 'shore', label: 'Shoreline' },
+    { id: 'deep', label: 'Deep water' },
+  ],
+  forest: [
+    { id: 'birdsong', label: 'Birdsong' },
+    { id: 'pines', label: 'Wind in pines' },
+    { id: 'rain', label: 'Light rain' },
+  ],
+  stream: [
+    { id: 'brook', label: 'Brook' },
+    { id: 'creek', label: 'Shallow creek' },
+  ],
+  crickets: [
+    { id: 'field', label: 'Summer field' },
+    { id: 'grass', label: 'Wind and grass' },
+  ],
+  fire: [
+    { id: 'crackle', label: 'Crackling' },
+    { id: 'embers', label: 'Embers' },
+  ],
+  fan: [
+    { id: 'low', label: 'Low speed' },
+    { id: 'high', label: 'High speed' },
+  ],
+  ac: [
+    { id: 'window', label: 'Window unit' },
+    { id: 'central', label: 'Central air' },
+  ],
+  radiator: [
+    { id: 'tick', label: 'Ticking' },
+    { id: 'hiss', label: 'Hiss' },
+  ],
+  train: [
+    { id: 'sleeper', label: 'Sleeper cabin' },
+    { id: 'carriage', label: 'Carriage' },
+  ],
+};

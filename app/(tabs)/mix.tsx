@@ -1,38 +1,151 @@
-import React, { useState } from 'react';
-import { Animated, ScrollView, Text, View } from 'react-native';
-import { PressScale, useToggleValue } from '../../src/components/Motion';
+import React from 'react';
+import { Image, ScrollView, StyleSheet, Text, View } from 'react-native';
+import { useRouter } from 'expo-router';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { LinearGradient } from 'expo-linear-gradient';
-import Slider from '@react-native-community/slider';
 import { Aurora } from '../../src/components/Aurora';
-import { AddSoundSheet } from '../../src/components/AddSoundSheet';
 import { GlassCard, PrimaryButton, RoundButton } from '../../src/components/Glass';
 import { Icon } from '../../src/components/Icon';
-import { soundById } from '../../src/data/sounds';
+import { PressScale } from '../../src/components/Motion';
+import { artFor, soundById } from '../../src/data/sounds';
+import { SavedMix, useMixes } from '../../src/mixes';
 import { usePlayer } from '../../src/state';
-import { color, font, motion, radius, safe, type as t } from '../../src/theme';
+import { color, font, glow, motion, radius, safe, space, type as t } from '../../src/theme';
 
 const TAB_CLEARANCE = 118;
 
-/** A muted layer settles down to 42% rather than snapping. */
-function LayerDim({ on, children }: { on: boolean; children: React.ReactNode }) {
-  const v = useToggleValue(on, 260);
+/**
+ * The person's own mixes.
+ *
+ * This tab used to be the mixer itself — one anonymous mix that was whatever
+ * you last fiddled with, and a Save button that saved nowhere. It is now the
+ * shelf those mixes sit on: empty until you make one, then a card for each,
+ * named by whoever made it. Building and editing happen on /mix-edit.
+ */
+
+/** A saved mix as a card — the same shape as a sound card, so the app reads as one app. */
+function MixCard({ mix, onPlay, onEdit, playing }: {
+  mix: SavedMix;
+  onPlay: () => void;
+  onEdit: () => void;
+  playing: boolean;
+}) {
+  // A mix has no photograph of its own, so it borrows its first layer's.
+  const lead = soundById(mix.layers[0]?.id ?? '');
+  const art = lead ? artFor(lead.id) : null;
+  const colors = (lead?.colors ?? [color.violet, color.night]) as readonly [string, string];
+  const count = mix.layers.length;
+
   return (
-    <Animated.View style={{ opacity: v.interpolate({ inputRange: [0, 1], outputRange: [0.42, 1] }) }}>
-      {children}
-    </Animated.View>
+    /*
+      The card is a plain container with three siblings inside it — the body,
+      and the two corner controls — rather than buttons nested inside a
+      button. Nesting them produced invalid markup on web and made the corner
+      taps depend on stopPropagation to not also trigger the card.
+    */
+    <View
+      style={{
+        width: '47.5%',
+        flexGrow: 1,
+        height: 138,
+        borderRadius: radius.lg,
+        overflow: 'hidden',
+        borderWidth: 1.5,
+        borderColor: playing ? color.accent : 'rgba(255,255,255,0.10)',
+      }}
+    >
+      <PressScale
+        onPress={onPlay}
+        accessibilityRole="button"
+        accessibilityLabel={`Play ${mix.name}`}
+        style={StyleSheet.absoluteFill}
+      >
+        <LinearGradient
+          colors={colors}
+          start={{ x: 0.1, y: 0 }}
+          end={{ x: 0.9, y: 1 }}
+          style={[StyleSheet.absoluteFill, { opacity: art ? 0.35 : 1 }]}
+        />
+        {art ? (
+          <Image
+            source={art}
+            style={[StyleSheet.absoluteFill, { width: '100%', height: '100%', opacity: 0.55 }]}
+            resizeMode="cover"
+          />
+        ) : null}
+        <LinearGradient
+          colors={['rgba(7,10,22,0.10)', 'rgba(7,10,22,0.45)', 'rgba(7,10,22,0.90)'] as const}
+          locations={[0, 0.5, 1]}
+          style={StyleSheet.absoluteFill}
+        />
+        <View style={{ position: 'absolute', left: 14, right: 14, bottom: 13, gap: 3 }}>
+          <Text style={[t.card, { color: color.ink, fontSize: 14.5, lineHeight: 18 }]} numberOfLines={2}>
+            {mix.name}
+          </Text>
+          <Text style={[t.meta, { color: color.ink62 }]}>
+            {count} {count === 1 ? 'sound' : 'sounds'}
+          </Text>
+        </View>
+      </PressScale>
+
+      {/*
+        Editing is a visible button, not a long press: a gesture nobody can
+        see is the same as no way to rename a mix at all.
+      */}
+      <PressScale
+        onPress={onEdit}
+        hitSlop={6}
+        scaleTo={0.88}
+        accessibilityRole="button"
+        accessibilityLabel={`Edit ${mix.name}`}
+        style={{
+          position: 'absolute',
+          left: 11,
+          top: 11,
+          width: 34,
+          height: 34,
+          borderRadius: 17,
+          alignItems: 'center',
+          justifyContent: 'center',
+          backgroundColor: 'rgba(7,10,22,0.38)',
+          borderWidth: 1,
+          borderColor: 'rgba(255,255,255,0.24)',
+        }}
+      >
+        <Icon name="mixer" size={14} color={color.ink} />
+      </PressScale>
+
+      <PressScale
+        onPress={onPlay}
+        hitSlop={8}
+        scaleTo={0.88}
+        accessibilityRole="button"
+        accessibilityLabel={playing ? `Pause ${mix.name}` : `Play ${mix.name}`}
+        style={{
+          position: 'absolute',
+          right: 11,
+          top: 11,
+          width: 38,
+          height: 38,
+          borderRadius: 19,
+          alignItems: 'center',
+          justifyContent: 'center',
+          backgroundColor: playing ? color.accent : 'rgba(7,10,22,0.38)',
+          borderWidth: 1,
+          borderColor: playing ? color.accent : 'rgba(255,255,255,0.24)',
+        }}
+      >
+        <Icon name={playing ? 'pause' : 'play'} size={14} color={playing ? color.onAccent : color.ink} />
+      </PressScale>
+    </View>
   );
 }
 
-export default function Mix() {
+export default function Mixes() {
+  const router = useRouter();
   const insets = useSafeAreaInsets();
   const p = usePlayer();
-  const [saved, setSaved] = useState(false);
-  const [picking, setPicking] = useState(false);
-
-  const layers = p.mixLayers.map(soundById).filter(Boolean) as NonNullable<
-    ReturnType<typeof soundById>
-  >[];
+  const { mixes, loaded } = useMixes();
 
   return (
     <View style={{ flex: 1, backgroundColor: color.ground }}>
@@ -43,132 +156,118 @@ export default function Mix() {
         ]}
       />
 
-      <View style={{ flex: 1, paddingTop: Math.max(insets.top, safe.top), paddingHorizontal: safe.side }}>
-        <View style={{ flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', minHeight: 44 }}>
-          <View style={{ width: 44 }} />
-          <Text style={[t.label, { color: color.ink58 }]}>Mixer</Text>
-          <RoundButton
-            onPress={() => {
-              p.resetLayers();
-              setSaved(false);
-            }}
-          >
-            <Icon name="refresh" size={19} />
-          </RoundButton>
-        </View>
-
-        <View style={{ height: 20 }} />
-
-        <View style={{ gap: 7 }}>
-          <Text style={[t.screen, { color: color.ink }]}>{p.title}</Text>
-          <Text style={[t.bodyMuted, { color: color.ink58 }]}>
-            {p.activeLayers} of {layers.length} layers playing · {p.fade.toLowerCase()}
+      <View style={{ flex: 1, paddingTop: Math.max(insets.top, safe.top) }}>
+        <View
+          style={{
+            paddingHorizontal: safe.side,
+            flexDirection: 'row',
+            alignItems: 'flex-end',
+            justifyContent: 'space-between',
+            minHeight: 44,
+          }}
+        >
+          <Text style={{ fontFamily: font.display, fontSize: 28, color: color.ink, letterSpacing: -0.7 }}>
+            My mixes
           </Text>
+          {/* Hidden until there is a list to add to — the empty state has its
+              own, larger invitation, and two buttons for one action is one
+              button too many. */}
+          {mixes.length ? (
+            <RoundButton label="New mix" onPress={() => router.push('/mix-edit')}>
+              <Icon name="plus" size={19} strokeWidth={1.9} />
+            </RoundButton>
+          ) : null}
         </View>
 
-        <View style={{ height: 20 }} />
+        <View style={{ height: space.lg }} />
 
-        <ScrollView style={{ flex: 1 }} showsVerticalScrollIndicator={false} contentContainerStyle={{ gap: 10, paddingBottom: TAB_CLEARANCE }}>
-          {layers.map((l) => {
-            const on = p.layerOn[l.id];
-            const vol = p.layerVol[l.id] ?? 50;
-            return (
-              <LayerDim key={l.id} on={on}>
-              <GlassCard style={{ padding: 14 }}>
-                <View style={{ flexDirection: 'row', alignItems: 'center', gap: 12, minHeight: 44 }}>
-                  <LinearGradient
-                    colors={l.colors as unknown as readonly [string, string]}
-                    start={{ x: 0.1, y: 0 }}
-                    end={{ x: 1, y: 1 }}
-                    style={{ width: 34, height: 34, borderRadius: radius.xs }}
-                  />
-                  <View style={{ flex: 1, gap: 2 }}>
-                    <Text style={[t.card, { color: color.ink }]}>{l.name}</Text>
-                    <Text style={[t.meta, { color: color.ink58 }]}>{l.meta}</Text>
-                  </View>
-                  <PressScale
-                    onPress={() => p.toggleLayer(l.id)}
-                    style={{
-                      width: 44,
-                      height: 44,
-                      borderRadius: radius.sm,
-                      alignItems: 'center',
-                      justifyContent: 'center',
-                      backgroundColor: on ? 'rgba(255,255,255,0.09)' : 'rgba(255,255,255,0.035)',
-                    }}
-                  >
-                    <Icon
-                      name={on ? 'volumeLow' : 'volumeOff'}
-                      size={19}
-                      color={on ? l.colors[0] : color.ink58}
-                    />
-                  </PressScale>
-                  <PressScale
-                    onPress={() => p.removeLayer(l.id)}
-                    style={{
-                      width: 44,
-                      height: 44,
-                      borderRadius: radius.sm,
-                      alignItems: 'center',
-                      justifyContent: 'center',
-                    }}
-                  >
-                    <Icon name="close" size={16} color={color.ink58} strokeWidth={1.8} />
-                  </PressScale>
-                </View>
-                <Slider
-                  style={{ width: '100%', height: 34 }}
-                  minimumValue={0}
-                  maximumValue={100}
-                  step={1}
-                  value={vol}
-                  onValueChange={(v) => p.setLayerVol(l.id, Math.round(v))}
-                  minimumTrackTintColor={l.colors[0]}
-                  maximumTrackTintColor="rgba(255,255,255,0.14)"
-                  thumbTintColor={color.ink}
-                />
-              </GlassCard>
-              </LayerDim>
-            );
-          })}
-
-          <PressScale
-            onPress={() => setPicking(true)}
-            style={{
-              minHeight: 56,
-              borderRadius: radius.lg,
-              flexDirection: 'row',
-              alignItems: 'center',
-              justifyContent: 'center',
-              gap: 9,
-              borderWidth: 1.5,
-              borderStyle: 'dashed',
-              borderColor: 'rgba(255,255,255,0.16)',
-            }}
+        {!loaded ? (
+          // Nothing, briefly. Better than flashing "no mixes yet" at someone
+          // who has ten.
+          <View style={{ flex: 1 }} />
+        ) : mixes.length === 0 ? (
+          <View style={{ flex: 1, paddingHorizontal: safe.side, justifyContent: 'center', paddingBottom: TAB_CLEARANCE }}>
+            <GlassCard r={radius.lg} style={{ padding: 22, gap: space.md, alignItems: 'center' }}>
+              <View
+                style={{
+                  width: 56,
+                  height: 56,
+                  borderRadius: 28,
+                  alignItems: 'center',
+                  justifyContent: 'center',
+                  backgroundColor: 'rgba(255,255,255,0.06)',
+                  borderWidth: 1,
+                  borderColor: color.glassBorder,
+                }}
+              >
+                <Icon name="mixer" size={24} color={color.ink72} />
+              </View>
+              <Text style={[t.card, { color: color.ink, fontSize: 17, textAlign: 'center' }]}>
+                Build your own sound
+              </Text>
+              <Text style={[t.body, { color: color.ink62, textAlign: 'center', lineHeight: 21 }]}>
+                Layer rain over a fan, or a stream under crickets. Set how loud each one sits, give
+                it a name, and it waits here for you.
+              </Text>
+              <PrimaryButton
+                label="Create a mix"
+                onPress={() => router.push('/mix-edit')}
+                style={{ alignSelf: 'stretch', marginTop: space.xs }}
+              />
+            </GlassCard>
+          </View>
+        ) : (
+          <ScrollView
+            style={{ flex: 1 }}
+            showsVerticalScrollIndicator={false}
+            contentContainerStyle={{ paddingHorizontal: safe.side, paddingBottom: TAB_CLEARANCE }}
           >
-            <Icon name="plus" size={18} color={color.ink72} strokeWidth={1.8} />
-            <Text style={{ fontFamily: font.semibold, fontSize: 14, color: color.ink72 }}>Add a sound</Text>
-          </PressScale>
+            <View style={{ flexDirection: 'row', flexWrap: 'wrap', gap: 12 }}>
+              {mixes.map((m) => (
+                <MixCard
+                  key={m.id}
+                  mix={m}
+                  playing={p.selection.id === m.id && p.playing}
+                  onPlay={() => {
+                    if (p.selection.id === m.id) p.togglePlay();
+                    else p.playMix(m);
+                    if (p.selection.id !== m.id) router.push('/player');
+                  }}
+                  onEdit={() => router.push({ pathname: '/mix-edit', params: { id: m.id } })}
+                />
+              ))}
+            </View>
 
-          <View style={{ height: 4 }} />
+            <View style={{ height: space.lg }} />
 
-          <PrimaryButton
-            label={saved ? 'Saved for tonight' : 'Save as tonight’s mix'}
-            onPress={() => setSaved((s) => !s)}
-            left={saved ? <Icon name="check" size={18} color={color.onAccent} strokeWidth={2.2} /> : undefined}
-          />
-        </ScrollView>
+            {/*
+              The same action as the header button, kept at the end of the
+              list so it is where the thumb already is after scrolling.
+            */}
+            <PressScale
+              onPress={() => router.push('/mix-edit')}
+              accessibilityRole="button"
+              accessibilityLabel="Create a mix"
+              style={{
+                minHeight: 56,
+                borderRadius: radius.lg,
+                flexDirection: 'row',
+                alignItems: 'center',
+                justifyContent: 'center',
+                gap: 9,
+                borderWidth: 1.5,
+                borderStyle: 'dashed',
+                borderColor: 'rgba(255,255,255,0.16)',
+              }}
+            >
+              <Icon name="plus" size={18} color={color.ink72} strokeWidth={1.8} />
+              <Text style={{ fontFamily: font.semibold, fontSize: 14, color: color.ink72 }}>
+                Create a mix
+              </Text>
+            </PressScale>
+          </ScrollView>
+        )}
       </View>
-
-      <AddSoundSheet
-        visible={picking}
-        inMix={p.mixLayers}
-        onAdd={(id) => {
-          p.addLayer(id);
-          setSaved(false);
-        }}
-        onClose={() => setPicking(false)}
-      />
     </View>
   );
 }

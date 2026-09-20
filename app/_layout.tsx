@@ -11,6 +11,8 @@ import {
   Manrope_600SemiBold,
   Manrope_700Bold,
 } from '@expo-google-fonts/manrope';
+import { AccountProvider } from '../src/account';
+import { MixesProvider } from '../src/mixes';
 import { AuthProvider } from '../src/auth';
 import { PlayerProvider } from '../src/state';
 import { SoundEngine } from '../src/audio/engine';
@@ -35,33 +37,40 @@ export default function RootLayout() {
   return (
     <SafeAreaProvider>
       <AuthProvider>
-      <PlayerProvider>
-        {/* Inside the provider so it can read player state, but rendered
-            from here rather than from state.tsx — that import was what made
-            state and the engine a require cycle. */}
-        <SoundEngine />
-        <TinnitusProvider>
-        <SampleProvider>
-        <StatusBar style="light" />
-        <Stack
-          screenOptions={{
-            headerShown: false,
-            contentStyle: { backgroundColor: color.ground },
-            animation: 'fade',
-          }}
-        >
-          <Stack.Screen name="index" />
-          {/* No fade into onboarding — the flow has its own transition, and
-              fading the whole first step in on top of that read as a second,
-              competing animation. */}
-          <Stack.Screen name="(onboarding)" options={{ animation: 'none' }} />
-          <Stack.Screen name="(tabs)" />
-          <Stack.Screen name="player" options={{ animation: 'slide_from_bottom' }} />
-          <Stack.Screen name="morning" options={{ animation: 'slide_from_bottom' }} />
-        </Stack>
-        </SampleProvider>
-        </TinnitusProvider>
-      </PlayerProvider>
+        <PlayerProvider>
+          {/* Inside the provider so it can read player state, but rendered
+              from here rather than from state.tsx — that import was what made
+              state and the engine a require cycle. */}
+          <SoundEngine />
+          <TinnitusProvider>
+            <AccountProvider>
+              <MixesProvider>
+                <SampleProvider>
+                  <StatusBar style="light" />
+                  <Stack
+                    screenOptions={{
+                      headerShown: false,
+                      contentStyle: { backgroundColor: color.ground },
+                      animation: 'fade',
+                    }}
+                  >
+                    <Stack.Screen name="index" />
+                    {/* No fade into onboarding — the flow has its own transition, and
+                        fading the whole first step in on top of that read as a second,
+                        competing animation. */}
+                    <Stack.Screen name="(onboarding)" options={{ animation: 'none' }} />
+                    <Stack.Screen name="(tabs)" />
+                    <Stack.Screen name="player" options={{ animation: 'slide_from_bottom' }} />
+                    <Stack.Screen name="morning" options={{ animation: 'slide_from_bottom' }} />
+                    {/* Building a mix is a task you come back out of, so it rises over
+                        the library rather than replacing it sideways. */}
+                    <Stack.Screen name="mix-edit" options={{ animation: 'slide_from_bottom' }} />
+                  </Stack>
+                </SampleProvider>
+              </MixesProvider>
+            </AccountProvider>
+          </TinnitusProvider>
+        </PlayerProvider>
       </AuthProvider>
     </SafeAreaProvider>
   );

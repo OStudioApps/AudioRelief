@@ -37,9 +37,16 @@ export function AddSoundSheet({
           <View style={[StyleSheet.absoluteFill, { backgroundColor: 'rgba(2,4,10,0.62)' }]} />
         </Pressable>
 
+        {/*
+          A fixed height, not `maxHeight`. Sized to its content, the sheet
+          grew and shrank every time a category was picked — the whole panel
+          jumped under the finger — and the scroll list inside it had no
+          bounded height to scroll within, so the last rows were cut off
+          below the edge with no way to reach them.
+        */}
         <View
           style={{
-            maxHeight: '86%',
+            height: '86%',
             borderTopLeftRadius: 28,
             borderTopRightRadius: 28,
             overflow: 'hidden',
@@ -50,11 +57,16 @@ export function AddSoundSheet({
           <BlurView
             intensity={60}
             tint="dark"
+            pointerEvents="none"
             style={StyleSheet.absoluteFill}
           />
-          <View style={[StyleSheet.absoluteFill, { backgroundColor: 'rgba(14,18,36,0.86)' }]} />
+          <View
+            pointerEvents="none"
+            style={[StyleSheet.absoluteFill, { backgroundColor: 'rgba(14,18,36,0.86)' }]}
+          />
 
-          <View style={{ paddingTop: 12, paddingBottom: Math.max(insets.bottom, safe.bottom) }}>
+          {/* flex: 1 so the list below inherits a real height to scroll in. */}
+          <View style={{ flex: 1, paddingTop: 12 }}>
             {/* Grabber */}
             <View style={{ alignItems: 'center', paddingBottom: 12 }}>
               <View style={{ width: 40, height: 4, borderRadius: 999, backgroundColor: 'rgba(255,255,255,0.18)' }} />
@@ -84,17 +96,43 @@ export function AddSoundSheet({
 
             <View style={{ height: 16 }} />
 
-            <View style={{ flexDirection: 'row', flexWrap: 'wrap', gap: 6, paddingHorizontal: safe.side }}>
+            {/*
+              One row that scrolls sideways, as on the Sounds tab. Wrapped,
+              the five chips took a second line on narrow phones and the list
+              below jumped up and down as categories changed.
+            */}
+            <ScrollView
+              horizontal
+              showsHorizontalScrollIndicator={false}
+              style={{ flexGrow: 0 }}
+              contentContainerStyle={{ gap: 6, paddingHorizontal: safe.side }}
+            >
               {CATEGORIES.map((c) => (
-                <Chip key={c.id} label={c.label} selected={cat === c.id} onPress={() => setCat(c.id)} />
+                <Chip
+                  key={c.id}
+                  label={c.label}
+                  selected={cat === c.id}
+                  onPress={() => setCat(c.id)}
+                  style={{ paddingHorizontal: 18 }}
+                />
               ))}
-            </View>
+            </ScrollView>
 
             <View style={{ height: 14 }} />
 
-            <ScrollView style={{ flex: 1 }}
+            {/*
+              The safe-area inset lives on the scrolling content, not on the
+              panel: as panel padding it shrank the list and still left the
+              final row half-hidden behind the home indicator.
+            */}
+            <ScrollView
+              style={{ flex: 1 }}
               showsVerticalScrollIndicator={false}
-              contentContainerStyle={{ paddingHorizontal: safe.side, gap: 8, paddingBottom: 8 }}
+              contentContainerStyle={{
+                paddingHorizontal: safe.side,
+                gap: 8,
+                paddingBottom: Math.max(insets.bottom, safe.bottom) + 12,
+              }}
             >
               {list.map((s) => {
                 const taken = inMix.includes(s.id);
@@ -102,6 +140,9 @@ export function AddSoundSheet({
                   <PressScale
                     key={s.id}
                     disabled={taken}
+                    accessibilityRole="button"
+                    accessibilityLabel={taken ? `${s.name}, already in your mix` : `Add ${s.name}`}
+                    accessibilityState={{ disabled: taken }}
                     onPress={() => {
                       onAdd(s.id);
                       onClose();

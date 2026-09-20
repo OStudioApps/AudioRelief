@@ -36,12 +36,22 @@ export function GlassCard({
         style,
       ]}
     >
+      {/*
+        The blur and the tint are decoration and must never take a touch.
+        They are absolutely positioned, and on web anything static inside the
+        card — an <input>, an <svg> — paints *beneath* them: the text input on
+        the sign-in screen sat under these two layers, so taps landed on the
+        glass instead of the field and the blur frosted its placeholder.
+        pointerEvents="none" lets touches fall through to whatever is inside.
+      */}
       <BlurView
         intensity={intensity}
         tint="dark"
+        pointerEvents="none"
         style={StyleSheet.absoluteFill}
       />
       <View
+        pointerEvents="none"
         style={[
           StyleSheet.absoluteFill,
           { backgroundColor: active ? color.glassFillActive : color.glassFill },
@@ -57,14 +67,19 @@ export function RoundButton({
   onPress,
   children,
   style,
+  label,
 }: {
   onPress?: () => void;
   children: React.ReactNode;
   style?: StyleProp<ViewStyle>;
+  /** Spoken name — these buttons are icon-only, so without it they announce as nothing. */
+  label?: string;
 }) {
   return (
     <PressScale
       onPress={onPress}
+      accessibilityRole="button"
+      accessibilityLabel={label}
       hitSlop={6}
       scaleTo={0.9}
       style={[
@@ -105,6 +120,9 @@ export function PrimaryButton({
     <PressScale
       onPress={disabled ? undefined : onPress}
       disabled={disabled}
+      accessibilityRole="button"
+      accessibilityLabel={label}
+      accessibilityState={{ disabled }}
       style={[
         {
           minHeight: 52,
@@ -150,6 +168,8 @@ export function SecondaryButton({
   return (
     <PressScale
       onPress={onPress}
+      accessibilityRole="button"
+      accessibilityLabel={label}
       style={[
         {
           minHeight: 52,
@@ -188,6 +208,11 @@ export function Chip({
   return (
     <PressScale
       onPress={onPress}
+      accessibilityRole="button"
+      accessibilityLabel={label}
+      // Chosen state is carried by colour alone otherwise, which a screen
+      // reader cannot see.
+      accessibilityState={{ selected }}
       scaleTo={0.94}
       style={[
         {
