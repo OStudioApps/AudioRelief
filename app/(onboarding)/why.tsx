@@ -28,36 +28,82 @@ import { color, radius, type as t } from '../../src/theme';
  */
 const SHOWN_RESEARCH = [RESEARCH[3], RESEARCH[0]];
 
-/** Attention narrowing onto one signal, then widening again. */
+/**
+ * The filter, drawn.
+ *
+ * This is the paragraph below it as a picture, not decoration: a day's worth
+ * of sound sits as quiet ticks along the floor, a dashed line marks the level
+ * the brain stops paying attention at, and one signal — the flagged one —
+ * crosses it. The gap either side of that signal is what "singled out" looks
+ * like.
+ *
+ * The heights are written out rather than generated. A formula gives a sine
+ * wave and a random seed gives noise; neither looks like a room.
+ */
+const AMBIENT = [
+  13, 22, 10, 26, 16, 9, 23, 14, 30, 12, 19, 25,
+  22, 13, 29, 17, 10, 25, 14, 20, 9, 28, 16, 12,
+];
+
+/** Where the ordinary sounds stand, and where the flagged one rises. */
+const FLOOR = 80;
+const FILTER_Y = 44;
+const FOCUS_X = 110;
+
 function AttentionArt() {
   return (
     <Svg width="100%" height="100%" viewBox="0 0 220 96" style={SVG_LAYER}>
-      {/* the competing sounds of an ordinary day */}
-      {[0, 1, 2, 3, 4, 5].map((i) => (
-        <Path
-          key={i}
-          d={`M${14 + i * 34} 62 q 8 -${10 + (i % 3) * 7} 16 0`}
-          stroke={color.ink58}
-          strokeWidth={1.6}
-          fill="none"
-          strokeLinecap="round"
-          opacity={0.5}
-        />
-      ))}
-      {/* the one the brain has singled out */}
+      {/*
+        The attention line. Dashed because it is a threshold rather than a
+        thing — nothing in the ear draws it.
+      */}
       <Path
-        d="M104 74 L104 20"
+        d={`M8 ${FILTER_Y} L212 ${FILTER_Y}`}
+        stroke={color.ink58}
+        strokeWidth={1}
+        strokeDasharray="3 6"
+        strokeLinecap="round"
+        opacity={0.5}
+      />
+
+      {AMBIENT.map((h, i) => {
+        const x = 12 + i * 8.2;
+        // A clear space around the flagged signal. Everything else recedes
+        // from it, which is the whole idea in one gap.
+        if (Math.abs(x - FOCUS_X) < 16) return null;
+        // Fading at both edges so the row reads as continuing past the frame
+        // rather than as twenty-four bars of something counted.
+        const edge = 1 - Math.abs(x - FOCUS_X) / 118;
+        return (
+          <Path
+            key={i}
+            d={`M${x} ${FLOOR} L${x} ${FLOOR - h}`}
+            stroke={color.ink}
+            strokeWidth={1.7}
+            strokeLinecap="round"
+            opacity={0.1 + edge * 0.2}
+          />
+        );
+      })}
+
+      {/* The one the brain has flagged: the only thing above the line. */}
+      <Circle cx={FOCUS_X} cy={18} r={13} fill={color.accent} opacity={0.08} />
+      <Circle cx={FOCUS_X} cy={18} r={7.5} fill={color.accent} opacity={0.16} />
+      <Path
+        d={`M${FOCUS_X} ${FLOOR} L${FOCUS_X} 18`}
         stroke={color.accent}
         strokeWidth={2.4}
         strokeLinecap="round"
       />
-      <Circle cx="104" cy="16" r="4" fill={color.accent} />
+      <Circle cx={FOCUS_X} cy={18} r={3.4} fill={color.accent} />
+
+      {/* The floor everything stands on, held quieter than the ticks. */}
       <Path
-        d="M6 80 L214 80"
-        stroke={color.ink58}
-        strokeWidth={1.4}
-        opacity={0.35}
+        d={`M8 ${FLOOR} L212 ${FLOOR}`}
+        stroke={color.ink}
+        strokeWidth={1}
         strokeLinecap="round"
+        opacity={0.14}
       />
     </Svg>
   );

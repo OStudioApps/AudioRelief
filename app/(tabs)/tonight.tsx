@@ -6,8 +6,7 @@ import { LinearGradient } from 'expo-linear-gradient';
 import { Aurora } from '../../src/components/Aurora';
 import { GlassCard, RoundButton, SectionLabel } from '../../src/components/Glass';
 import { Icon } from '../../src/components/Icon';
-import { FadeIn, PressScale } from '../../src/components/Motion';
-import { useAuth } from '../../src/auth';
+import { FadeIn, PressScale, useReducedMotion } from '../../src/components/Motion';
 import { usePlayer } from '../../src/state';
 import { useTinnitus } from '../../src/tinnitus';
 import { artFor, MIXES, MIX_ART, NOISES, soundById } from '../../src/data/sounds';
@@ -20,73 +19,8 @@ import {
   profileSummary,
   timingFor,
 } from '../../src/data/recommend';
-import { errorMessage } from '../../src/lib/supabase';
 import { setFlowMode } from '../../src/onboardingFlow';
-import { color, font, glow, motion, radius, safe, type as t } from '../../src/theme';
-
-/**
- * Account state, tucked into the profile card.
- *
- * There is no settings screen, and an account is optional — so this is the
- * one place it needs to live: it says who you are and lets you leave, or
- * offers the account to someone who has not made one.
- */
-function AccountRow() {
-  const router = useRouter();
-  const { signedIn, profile, session, loaded, configured, signOut } = useAuth();
-  const [busy, setBusy] = useState(false);
-  const [error, setError] = useState<string | null>(null);
-
-  // Nothing to say until we know, and nothing to offer without a backend.
-  if (!configured || !loaded) return null;
-
-  const email = profile?.email ?? session?.user.email ?? null;
-
-  return (
-    <View style={{ gap: 8, borderTopWidth: 1, borderTopColor: color.glassBorder, paddingTop: 14 }}>
-      {signedIn ? (
-        <View style={{ flexDirection: 'row', alignItems: 'center', gap: 12 }}>
-          <View style={{ flex: 1, gap: 2 }}>
-            <Text style={[t.meta, { color: color.ink58 }]}>Signed in as</Text>
-            <Text style={[t.meta, { color: color.ink82 }]} numberOfLines={1}>
-              {email ?? 'your account'}
-            </Text>
-          </View>
-          <PressScale
-            onPress={() => {
-              if (busy) return;
-              setBusy(true);
-              setError(null);
-              void signOut()
-                .catch((e) => setError(errorMessage(e)))
-                .finally(() => setBusy(false));
-            }}
-            hitSlop={8}
-          >
-            <Text style={{ fontFamily: t.body.fontFamily, fontSize: 13, color: color.ink58 }}>
-              {busy ? 'Signing out…' : 'Sign out'}
-            </Text>
-          </PressScale>
-        </View>
-      ) : (
-        <View style={{ flexDirection: 'row', alignItems: 'center', gap: 12 }}>
-          <Text style={[t.meta, { color: color.ink58, flex: 1, lineHeight: 17 }]}>
-            An account keeps your mixes if you change phone.
-          </Text>
-          <PressScale onPress={() => router.push('/(onboarding)/auth')} hitSlop={8}>
-            <Text style={{ fontFamily: t.body.fontFamily, fontSize: 13, color: color.accent }}>
-              Sign in
-            </Text>
-          </PressScale>
-        </View>
-      )}
-
-      {error ? (
-        <Text style={[t.meta, { color: color.scaleBad, lineHeight: 17 }]}>{error}</Text>
-      ) : null}
-    </View>
-  );
-}
+import { color, font, glow, motion, radius, rgba, safe, type as t } from '../../src/theme';
 
 const TAB_CLEARANCE = 118;
 
@@ -128,6 +62,121 @@ function BreathingHalo({ tint, active }: { tint: string; active: boolean }) {
         transform: [{ scale: v.interpolate({ inputRange: [0, 1], outputRange: [0.92, 1.08] }) }],
       }}
     />
+  );
+}
+
+/**
+ * One of the four generated noises.
+ *
+ * Each of these is a different signal, so each tile carries its own colour
+ * rather than four identical grey boxes with a dot in them: the sound's
+ * gradient as a glowing bead, the same colour washed faintly across the tile
+ * behind it, and a light ring to give the bead some glass.
+ *
+ * The one actually playing breathes, on the same 7-second cycle as the orb
+ * in the player — the app's one piece of shared body language for "this is
+ * the sound you are hearing".
+ */
+function NoiseTile({
+  name,
+  colors,
+  selected,
+  playing,
+  suggested,
+  onPress,
+}: {
+  name: string;
+  colors: readonly [string, string];
+  selected: boolean;
+  playing: boolean;
+  suggested: boolean;
+  onPress: () => void;
+}) {
+  const breath = useRef(new Animated.Value(0)).current;
+  const reduced = useReducedMotion();
+
+  useEffect(() => {
+    if (!playing || reduced) {
+      breath.setValue(0);
+      return;
+    }
+    const loop = Animated.loop(
+      Animated.sequence([
+        Animated.timing(breath, {
+          toValue: 1,
+          duration: motion.breath / 2,
+          easing: Easing.inOut(Easing.ease),
+          useNativeDriver: true,
+        }),
+        Animated.timing(breath, {
+          toValue: 0,
+          duration: motion.breath / 2,
+          easing: Easing.inOut(Easing.ease),
+          useNativeDriver: true,
+        }),
+      ]),
+    );
+    loop.start();
+    return () => loop.stop();
+  }, [playing, reduced, breath]);
+
+  return (
+    <PressScale
+      onPress={onPress}
+      accessibilityRole="button"
+      accessibilityLabel={`${name} noise`}
+      accessibilityState={{ selected }}
+      style={{
+        flex: 1,
+        minHeight: 88,
+        alignItems: 'center',
+        justifyContent: 'center',
+        gap: 10,
+        borderRadius: radius.md,
+        overflow: 'hidden',
+        backgroundColor: selected ? 'rgba(255,255,255,0.075)' : 'rgba(255,255,255,0.03)',
+        borderWidth: 1.5,
+        borderColor: selected ? color.accent : suggested ? 'rgba(95,224,210,0.35)' : 'rgba(255,255,255,0.07)',
+      }}
+    >
+      {/* The sound's own colour, washed up from the bead and fading out
+          before the top edge so the tiles still read as a set. */}
+      <LinearGradient
+        pointerEvents="none"
+        colors={['transparent', rgba(colors[0], selected ? 0.22 : 0.13)] as const}
+        style={StyleSheet.absoluteFill}
+      />
+
+      <Animated.View
+        style={{
+          width: 34,
+          height: 34,
+          borderRadius: 17,
+          boxShadow: glow(colors[0], selected ? 0.5 : 0.32, selected ? 20 : 14, 0),
+          transform: [{ scale: breath.interpolate({ inputRange: [0, 1], outputRange: [1, 1.07] }) }],
+        }}
+      >
+        <LinearGradient
+          colors={colors}
+          start={{ x: 0.2, y: 0.05 }}
+          end={{ x: 0.9, y: 1 }}
+          style={{ width: '100%', height: '100%', borderRadius: 17 }}
+        />
+        {/* A hairline highlight: without it the bead is a flat disc, with it
+            it reads as something with a surface. */}
+        <View
+          pointerEvents="none"
+          style={[
+            StyleSheet.absoluteFill,
+            { borderRadius: 17, borderWidth: 1, borderColor: 'rgba(255,255,255,0.3)' },
+          ]}
+        />
+      </Animated.View>
+
+      <Text style={{ fontFamily: font.semibold, fontSize: 12, color: selected ? color.ink : color.ink82 }}>
+        {name}
+      </Text>
+    </PressScale>
   );
 }
 
@@ -347,8 +396,8 @@ export default function Home() {
             notification channel — anything waiting surfaces on that screen.
           */}
           <View>
-            <RoundButton onPress={() => router.push('/morning')}>
-              <Icon name="chart" />
+            <RoundButton label="Your dashboard" onPress={() => router.push('/dashboard')}>
+              <Icon name="dashboard" />
             </RoundButton>
             {dueForCheckin ? (
               <View
@@ -517,10 +566,7 @@ export default function Home() {
 
         <View style={{ height: 18 }} />
 
-        <View style={{ flexDirection: 'row', alignItems: 'baseline', justifyContent: 'space-between' }}>
-          <SectionLabel>Steady noise</SectionLabel>
-          <Text style={{ fontFamily: t.body.fontFamily, fontSize: 13, color: color.ink58 }}>No loop</Text>
-        </View>
+        <SectionLabel>Steady noise</SectionLabel>
 
         <View style={{ height: 10 }} />
 
@@ -529,36 +575,33 @@ export default function Home() {
             const on = p.selection.kind === 'noise' && p.selection.id === n.id;
             const suggested = tin.hasProfile && n.id === pick.id;
             return (
-              <PressScale
+              <NoiseTile
                 key={n.id}
+                name={n.name}
+                colors={n.colors as unknown as readonly [string, string]}
+                selected={on}
+                playing={on && p.playing}
+                suggested={suggested}
                 onPress={() => p.select({ kind: 'noise', id: n.id })}
-                style={{
-                  flex: 1,
-                  minHeight: 78,
-                  alignItems: 'center',
-                  justifyContent: 'center',
-                  gap: 9,
-                  borderRadius: radius.md,
-                  backgroundColor: on ? 'rgba(255,255,255,0.085)' : 'rgba(255,255,255,0.035)',
-                  borderWidth: 1.5,
-                  borderColor: on ? color.accent : suggested ? 'rgba(95,224,210,0.35)' : 'rgba(255,255,255,0.07)',
-                }}
-              >
-                <LinearGradient
-                  colors={n.colors as unknown as readonly [string, string]}
-                  start={{ x: 0.2, y: 0.1 }}
-                  end={{ x: 1, y: 1 }}
-                  style={{ width: 30, height: 30, borderRadius: 15 }}
-                />
-                <Text style={{ fontFamily: font.semibold, fontSize: 12, color: color.ink82 }}>{n.name}</Text>
-              </PressScale>
+              />
             );
           })}
         </View>
 
         {tin.loaded && tin.hasProfile ? (
           <>
-            <View style={{ height: 18 }} />
+            {/*
+              Everything above this line is the catalogue — things to play.
+              Everything below it is about the person: what suits their
+              tinnitus, and the check-in. Same 18px gap as the sections above
+              made it read as one more row of the same list, so the change of
+              subject gets a wider gap and a hairline. No heading: the card
+              underneath already says "For your tinnitus", and printing that
+              twice would be worse than not marking it at all.
+            */}
+            <View style={{ height: 26 }} />
+            <View style={{ height: 1, backgroundColor: color.ink, opacity: 0.08 }} />
+            <View style={{ height: 22 }} />
 
             {/*
               Folded shut by default. Someone opening the app at 3am wants a
@@ -576,6 +619,10 @@ export default function Home() {
             >
               <PressScale
                 onPress={() => setOpen((o) => !o)}
+                accessibilityRole="button"
+                accessibilityLabel="For your tinnitus"
+                accessibilityState={{ expanded: open }}
+                accessibilityHint={open ? 'Collapses your suggestions' : 'Shows sounds picked for you'}
                 style={{
                   flexDirection: 'row',
                   alignItems: 'center',
@@ -584,63 +631,127 @@ export default function Home() {
                   minHeight: 56,
                 }}
               >
+                {/* A small brain mark: the card is the one place the app
+                    speaks about the person rather than the catalogue, and
+                    the header was pure text against four picture cards. */}
+                <View
+                  style={{
+                    width: 34,
+                    height: 34,
+                    borderRadius: 17,
+                    alignItems: 'center',
+                    justifyContent: 'center',
+                    backgroundColor: rgba(color.accent, 0.12),
+                    borderWidth: 1,
+                    borderColor: rgba(color.accent, 0.3),
+                  }}
+                >
+                  <Icon name="brain" size={17} color={color.accent} />
+                </View>
                 <View style={{ flex: 1, gap: 3 }}>
                   <Text style={[t.card, { color: color.ink, fontSize: 14.5 }]}>For your tinnitus</Text>
-                  <Text style={[t.meta, { color: color.ink58 }]}>
-                    {profileSummary(tin.character, tin.hz, tin.toneUnknown)}
+                  <Text style={[t.meta, { color: color.ink58 }]} numberOfLines={1}>
+                    {open
+                      ? profileSummary(tin.character, tin.hz, tin.toneUnknown)
+                      : `${profileSummary(tin.character, tin.hz, tin.toneUnknown)} · 2 picks`}
                   </Text>
                 </View>
                 <Icon name={open ? 'chevronDown' : 'chevronRight'} size={16} color={color.ink58} />
               </PressScale>
 
               {open ? (
-                <View style={{ paddingHorizontal: 16, paddingBottom: 16, gap: 14 }}>
+                /*
+                  Two kinds of thing live in here and they used to be one flat
+                  list: sounds you can start, and advice about how to use
+                  them. They are now grouped and labelled, so the eye can go
+                  straight to the thing it can act on.
+
+                  A "Signed in as / Sign out" row also used to sit at the
+                  bottom of this card. Sign-out belongs in Account, not inside
+                  a card about somebody's tinnitus.
+                */
+                <View style={{ paddingHorizontal: 16, paddingBottom: 16, gap: 16 }}>
                   <View style={{ gap: 8 }}>
+                    <Text style={[t.label, { color: color.ink58 }]}>Start with</Text>
                     <SoundSuggestion id={pick.id} reason={pick.reason} lead onPress={() => startNoise(pick.id)} />
                     <SoundSuggestion id={alt.id} reason={alt.reason} lead={false} onPress={() => startNoise(alt.id)} />
                   </View>
 
-                  <View style={{ flexDirection: 'row', gap: 10, alignItems: 'flex-start' }}>
-                    <Icon name="volumeLow" size={17} color={color.accent} />
-                    <Text style={[t.meta, { color: color.ink62, flex: 1, lineHeight: 17 }]}>
-                      {LEVEL_GUIDANCE}
-                    </Text>
+                  {/* Advice, set back in its own inset panel so it reads as
+                      guidance rather than as two more tappable rows. */}
+                  <View
+                    style={{
+                      gap: 12,
+                      padding: 14,
+                      borderRadius: radius.md,
+                      backgroundColor: 'rgba(255,255,255,0.03)',
+                      borderWidth: 1,
+                      borderColor: color.glassBorder,
+                    }}
+                  >
+                    <Text style={[t.label, { color: color.ink58 }]}>How to use it</Text>
+
+                    <View style={{ flexDirection: 'row', gap: 10, alignItems: 'flex-start' }}>
+                      <Icon name="volumeLow" size={17} color={color.accent} />
+                      <Text style={[t.meta, { color: color.ink62, flex: 1, lineHeight: 17 }]}>
+                        {LEVEL_GUIDANCE}
+                      </Text>
+                    </View>
+
+                    {timing ? (
+                      <View style={{ flexDirection: 'row', gap: 10, alignItems: 'flex-start' }}>
+                        <Icon name="clock" size={17} color={color.accent} />
+                        <Text style={[t.meta, { color: color.ink62, flex: 1, lineHeight: 17 }]}>{timing}</Text>
+                      </View>
+                    ) : null}
                   </View>
 
-                  {timing ? (
-                    <View style={{ flexDirection: 'row', gap: 10, alignItems: 'flex-start' }}>
-                      <Icon name="clock" size={17} color={color.accent} />
-                      <Text style={[t.meta, { color: color.ink62, flex: 1, lineHeight: 17 }]}>{timing}</Text>
-                    </View>
-                  ) : null}
-
+                  {/* The one thing here that is not about sound. It keeps the
+                      warning colour and an icon, so it cannot be skimmed as
+                      more advice. */}
                   {tin.character === 'pulsing' ? (
                     <View
                       style={{
+                        flexDirection: 'row',
+                        gap: 10,
                         padding: 12,
                         borderRadius: radius.sm,
-                        backgroundColor: 'rgba(242,163,101,0.10)',
+                        backgroundColor: rgba(color.scaleMid, 0.1),
                         borderWidth: 1,
-                        borderColor: 'rgba(242,163,101,0.28)',
+                        borderColor: rgba(color.scaleMid, 0.28),
                       }}
                     >
-                      <Text style={[t.meta, { color: '#F2A365', lineHeight: 17 }]}>
+                      <Icon name="heart" size={16} color={color.scaleMid} />
+                      <Text style={[t.meta, { color: color.scaleMid, flex: 1, lineHeight: 17 }]}>
                         You said yours pulses with your heartbeat. That one is worth having a doctor
                         look at — sound can still help meanwhile.
                       </Text>
                     </View>
                   ) : null}
 
-                  <PressScale onPress={() => {
-                  setFlowMode('edit');
-                  router.push('/(onboarding)/sound');
-                }}>
-                    <Text style={{ fontFamily: t.body.fontFamily, fontSize: 13, color: color.accent }}>
-                      Edit my profile
+                  {/* A full-width row with a real touch target. It was a 13px
+                      text link with no padding, well under 44pt. */}
+                  <View style={{ height: 1, backgroundColor: color.ink, opacity: 0.07 }} />
+                  <PressScale
+                    onPress={() => {
+                      setFlowMode('edit');
+                      router.push('/(onboarding)/sound');
+                    }}
+                    accessibilityRole="button"
+                    accessibilityLabel="Edit my tinnitus profile"
+                    style={{
+                      flexDirection: 'row',
+                      alignItems: 'center',
+                      gap: 10,
+                      minHeight: 44,
+                    }}
+                  >
+                    <Icon name="refresh" size={16} color={color.ink58} />
+                    <Text style={{ fontFamily: t.body.fontFamily, fontSize: 13.5, color: color.ink82, flex: 1 }}>
+                      Edit my answers
                     </Text>
+                    <Icon name="chevronRight" size={15} color={color.ink58} />
                   </PressScale>
-
-                  <AccountRow />
                 </View>
               ) : null}
             </View>

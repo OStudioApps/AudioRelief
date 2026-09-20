@@ -1,7 +1,7 @@
 import React from 'react';
 import { Text, View } from 'react-native';
 import { useRouter } from 'expo-router';
-import Svg, { Rect } from 'react-native-svg';
+import Svg, { Circle, Path, Rect } from 'react-native-svg';
 import { OnboardingScreen } from '../../src/components/Onboarding';
 import { GlassCard } from '../../src/components/Glass';
 import { SVG_LAYER } from '../../src/components/Icon';
@@ -19,32 +19,83 @@ import { color, font, radius, type as t } from '../../src/theme';
  * The copy stays mechanical — what the sound does, never what it will achieve.
  */
 
-/** A spectrum with a gap cut where their tinnitus sits. */
+/**
+ * The band of sound, with a notch cut at their pitch.
+ *
+ * Written out rather than generated, for the same reason as the drawing on
+ * the "why" screen: the old strip was `sin()` across 24 bars, and a perfect
+ * arch is the one shape no real spectrum makes. These are low at both ends,
+ * fullest through the middle, and uneven along the top.
+ */
+const BAND = [
+  10, 14, 19, 26, 31, 36, 40, 44, 47, 45,
+  49, 46, 50, 48, 51, 47, 50, 46, 48, 44,
+  46, 41, 43, 38, 35, 31, 26, 21, 16, 11,
+];
+
+/**
+ * The notch itself.
+ *
+ * The three bars at their pitch are cut flat to a stub, with the band at
+ * full height either side of them. That gap is the whole point of the
+ * picture, so it gets hard edges. An earlier version tapered gently into it
+ * and faded the stubs nearly to nothing: prettier, but the missing part
+ * stopped reading, and the legend below was left explaining something
+ * invisible.
+ */
+const STUB = 8;
+
+const FLOOR = 78;
+
 function NotchChart({ index }: { index: number | null }) {
-  const bars = 24;
-  // Map the matched tone onto the bar strip; unmatched sits centre with no gap.
-  const centre = index === null ? -1 : Math.round((index / (TONES.length - 1)) * (bars - 1));
+  // Map the matched tone onto the strip; unmatched gets no notch at all.
+  const centre = index === null ? -1 : Math.round((index / (TONES.length - 1)) * (BAND.length - 1));
+  const x = (i: number) => 7 + i * 7.8;
 
   return (
     <Svg width="100%" height="100%" viewBox="0 0 240 90" style={SVG_LAYER}>
-      {Array.from({ length: bars }).map((_, i) => {
-        const notched = centre >= 0 && Math.abs(i - centre) <= 1;
-        // A gentle arch so the strip reads as a spectrum, not a bar chart.
-        const h = 26 + 34 * Math.sin((i / (bars - 1)) * Math.PI);
+      {BAND.map((full, i) => {
+        const d = centre >= 0 ? Math.abs(i - centre) : 99;
+        // Cut flat at the pitch, stepping back up on either shoulder.
+        // Full height right up to the edge of the cut. Easing into it read
+        // as the band sagging rather than as a piece deliberately removed.
+        const cut = d <= 1;
+        const h = cut ? STUB : full;
         return (
           <Rect
             key={i}
-            x={6 + i * 9.7}
-            y={78 - (notched ? 8 : h)}
-            width={6}
-            height={notched ? 8 : h}
-            rx={3}
-            fill={notched ? color.ink58 : color.accent}
-            opacity={notched ? 0.35 : 0.9}
+            x={x(i)}
+            y={FLOOR - h}
+            width={4.6}
+            height={h}
+            rx={2.3}
+            fill={cut ? color.ink58 : color.accent}
+            // Light enough to be read as bars that are still there, just
+            // quiet — not as an empty hole.
+            opacity={cut ? 0.4 : 0.62 + (full / 51) * 0.28}
           />
         );
       })}
-      <Rect x="0" y="80" width="240" height="1.5" rx={1} fill={color.ink58} opacity={0.3} />
+
+      {/*
+        Where their pitch sits. Dashed, like the attention line on the "why"
+        screen — both are reference marks rather than things you could hear.
+      */}
+      {centre >= 0 ? (
+        <>
+          <Path
+            d={`M${x(centre) + 1.6} ${FLOOR} L${x(centre) + 1.6} 16`}
+            stroke={color.accent}
+            strokeWidth={1}
+            strokeDasharray="3 5"
+            strokeLinecap="round"
+            opacity={0.55}
+          />
+          <Circle cx={x(centre) + 1.6} cy={13} r={2.8} fill={color.accent} />
+        </>
+      ) : null}
+
+      <Rect x="0" y={FLOOR + 2} width="240" height="1" rx={0.5} fill={color.ink} opacity={0.14} />
     </Svg>
   );
 }

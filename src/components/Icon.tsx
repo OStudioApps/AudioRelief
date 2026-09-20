@@ -32,6 +32,7 @@ import {
   ShieldCheck,
   SignOut,
   SlidersHorizontal,
+  SquaresFour,
   SpeakerHigh,
   SpeakerLow,
   SpeakerNone,
@@ -100,6 +101,7 @@ const ICONS: Record<string, PhosphorIcon> = {
   brain: Brain,
   sun: Sun,
   mixer: SlidersHorizontal,
+  dashboard: SquaresFour,
   // Account screen.
   user: User,
   language: GlobeSimple,

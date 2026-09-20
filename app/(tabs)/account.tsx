@@ -11,7 +11,8 @@ import { PressScale } from '../../src/components/Motion';
 import { CHARACTERS, TONES, WORST_WHEN } from '../../src/data/tinnitus';
 import { PRIVACY_POLICY, TERMS_OF_SERVICE } from '../../src/legal/content';
 import { setFlowMode } from '../../src/onboardingFlow';
-import { useAccount } from '../../src/account';
+import { useAuth } from '../../src/auth';
+import { errorMessage } from '../../src/lib/supabase';
 import { useTinnitus } from '../../src/tinnitus';
 import { color, font, glow, radius, safe, space, type as t } from '../../src/theme';
 
@@ -109,7 +110,16 @@ export default function Account() {
   const router = useRouter();
   const insets = useSafeAreaInsets();
   const tin = useTinnitus();
-  const acct = useAccount();
+  /*
+    The real session, not the device-local placeholder this screen was built
+    against — that existed only because there was no server yet, and there
+    is one now. Sign-out lives here alone: it used to sit at the bottom of
+    the "For your tinnitus" card on Home, which is no place for it.
+  */
+  const { signedIn, profile, session, configured, signOut } = useAuth();
+  const email = profile?.email ?? session?.user.email ?? null;
+  const [signingOut, setSigningOut] = useState(false);
+  const [authError, setAuthError] = useState<string | null>(null);
   const [legalDoc, setLegalDoc] = useState<'terms' | 'privacy' | null>(null);
   // Two taps to wipe the profile, rather than a native Alert — Alert does
   // nothing on web, and this has to be equally undoable everywhere.
@@ -177,15 +187,15 @@ export default function Account() {
               </View>
               <View style={{ flex: 1, gap: 3 }}>
                 <Text style={[t.card, { color: color.ink, fontSize: 16 }]} numberOfLines={1}>
-                  {acct.signedIn ? acct.email : 'Not signed in'}
+                  {signedIn ? (email ?? 'Signed in') : 'Not signed in'}
                 </Text>
                 <Text style={[t.meta, { color: color.ink62, lineHeight: 17 }]}>
-                  Everything is stored on this phone only.
+                  Your tinnitus profile stays on this phone.
                 </Text>
               </View>
             </View>
 
-            {acct.signedIn ? null : (
+            {signedIn ? null : (
               <PressScale
                 onPress={() => router.push('/(onboarding)/auth')}
                 accessibilityRole="button"
@@ -206,9 +216,11 @@ export default function Account() {
             )}
 
             <Text style={[t.meta, { color: color.ink58, lineHeight: 17 }]}>
-              {acct.signedIn
-                ? 'This sign-in is local to this phone — there is no server behind it yet, and no password was checked or stored.'
-                : 'Accounts are not connected to a server yet, so there is nothing to lose if you skip it. An account will be for carrying your profile to a new phone — not for unlocking anything.'}
+              {!configured
+                ? 'This build has no Supabase keys, so accounts are unavailable. The app works without one.'
+                : signedIn
+                  ? 'An account carries your account to a new phone. Your tinnitus profile and your mixes are kept on this device and are not uploaded.'
+                  : 'You do not need one. Every sound, mix and timer works signed out — an account is for keeping your place if you change phone.'}
             </Text>
           </GlassCard>
 
@@ -267,29 +279,29 @@ export default function Account() {
           </Section>
 
           {/*
-            The real equivalent of signing out while the app is local-only:
-            removing what it knows. Destructive, so it is last, separated, red,
-            and asks twice.
-          */}
-          {/*
             Signing out and deleting the profile are different sizes of
             destructive, so they are different rows: one ends the session, the
             other destroys data. Neither is near anything routine.
           */}
-          {acct.signedIn ? (
+          {signedIn ? (
             <Section label="Session">
               <Row
                 icon="signOut"
-                label="Sign out"
-                note="Your tinnitus profile stays on this phone"
+                label={signingOut ? 'Signing out…' : 'Sign out'}
+                note={authError ?? 'Your tinnitus profile stays on this phone'}
                 first
                 onPress={() => {
-                  acct.signOut();
+                  if (signingOut) return;
+                  setSigningOut(true);
+                  setAuthError(null);
                   // Leave the signed-in screen rather than redraw it signed
                   // out under the person's finger — signing out should look
                   // like it went somewhere. `replace`, so Back cannot return
                   // to an account screen that no longer belongs to anyone.
-                  router.replace({ pathname: '/(onboarding)/auth', params: { mode: 'in' } });
+                  void signOut()
+                    .then(() => router.replace({ pathname: '/(onboarding)/auth', params: { mode: 'in' } }))
+                    .catch((e) => setAuthError(errorMessage(e)))
+                    .finally(() => setSigningOut(false));
                 }}
               />
             </Section>

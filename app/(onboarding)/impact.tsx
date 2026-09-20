@@ -4,6 +4,7 @@ import { useRouter } from 'expo-router';
 import { OnboardingScreen } from '../../src/components/Onboarding';
 import { PressScale } from '../../src/components/Motion';
 import { useTinnitus } from '../../src/tinnitus';
+import { useHistory } from '../../src/history';
 import { getFlowMode } from '../../src/onboardingFlow';
 import { color, font, glow, radius, rgba, type as t } from '../../src/theme';
 
@@ -35,6 +36,7 @@ function bandColor(n: number) {
 export default function ImpactStep() {
   const router = useRouter();
   const { impact, setImpact } = useTinnitus();
+  const { logImpact } = useHistory();
 
   const anchor =
     impact === null
@@ -55,13 +57,15 @@ export default function ImpactStep() {
       subtitle="On an ordinary day — not your worst one."
       cta={getFlowMode() === 'checkin' ? 'Save' : 'Continue'}
       ctaDisabled={impact === null}
-      onNext={() =>
+      onNext={() => {
+        // Recorded on the way out, not on every tap of the scale — sliding
+        // from 2 to 7 looking for the right number is one answer, not six.
+        if (impact !== null) logImpact(impact);
         // A check-in is this one question, as the card on home promises.
         // Carrying on through the remaining steps would be a bait and switch.
-        getFlowMode() === 'checkin'
-          ? router.replace('/(tabs)/tonight')
-          : router.push('/(onboarding)/pattern')
-      }
+        if (getFlowMode() === 'checkin') router.replace('/(tabs)/tonight');
+        else router.push('/(onboarding)/pattern');
+      }}
       footer={
         <Text style={[t.meta, { color: color.ink58, textAlign: 'center' }]}>
           We ask this again every few weeks. That comparison is the point of it.
