@@ -7,6 +7,7 @@ import { Aurora } from '../../src/components/Aurora';
 import { GlassCard, RoundButton, SectionLabel } from '../../src/components/Glass';
 import { Icon } from '../../src/components/Icon';
 import { FadeIn, PressScale } from '../../src/components/Motion';
+import { useAuth } from '../../src/auth';
 import { usePlayer } from '../../src/state';
 import { useTinnitus } from '../../src/tinnitus';
 import { artFor, MIXES, MIX_ART, NOISES, soundById } from '../../src/data/sounds';
@@ -19,8 +20,73 @@ import {
   profileSummary,
   timingFor,
 } from '../../src/data/recommend';
+import { errorMessage } from '../../src/lib/supabase';
 import { setFlowMode } from '../../src/onboardingFlow';
 import { color, font, glow, motion, radius, safe, type as t } from '../../src/theme';
+
+/**
+ * Account state, tucked into the profile card.
+ *
+ * There is no settings screen, and an account is optional — so this is the
+ * one place it needs to live: it says who you are and lets you leave, or
+ * offers the account to someone who has not made one.
+ */
+function AccountRow() {
+  const router = useRouter();
+  const { signedIn, profile, session, loaded, configured, signOut } = useAuth();
+  const [busy, setBusy] = useState(false);
+  const [error, setError] = useState<string | null>(null);
+
+  // Nothing to say until we know, and nothing to offer without a backend.
+  if (!configured || !loaded) return null;
+
+  const email = profile?.email ?? session?.user.email ?? null;
+
+  return (
+    <View style={{ gap: 8, borderTopWidth: 1, borderTopColor: color.glassBorder, paddingTop: 14 }}>
+      {signedIn ? (
+        <View style={{ flexDirection: 'row', alignItems: 'center', gap: 12 }}>
+          <View style={{ flex: 1, gap: 2 }}>
+            <Text style={[t.meta, { color: color.ink58 }]}>Signed in as</Text>
+            <Text style={[t.meta, { color: color.ink82 }]} numberOfLines={1}>
+              {email ?? 'your account'}
+            </Text>
+          </View>
+          <PressScale
+            onPress={() => {
+              if (busy) return;
+              setBusy(true);
+              setError(null);
+              void signOut()
+                .catch((e) => setError(errorMessage(e)))
+                .finally(() => setBusy(false));
+            }}
+            hitSlop={8}
+          >
+            <Text style={{ fontFamily: t.body.fontFamily, fontSize: 13, color: color.ink58 }}>
+              {busy ? 'Signing out…' : 'Sign out'}
+            </Text>
+          </PressScale>
+        </View>
+      ) : (
+        <View style={{ flexDirection: 'row', alignItems: 'center', gap: 12 }}>
+          <Text style={[t.meta, { color: color.ink58, flex: 1, lineHeight: 17 }]}>
+            An account keeps your mixes if you change phone.
+          </Text>
+          <PressScale onPress={() => router.push('/(onboarding)/auth')} hitSlop={8}>
+            <Text style={{ fontFamily: t.body.fontFamily, fontSize: 13, color: color.accent }}>
+              Sign in
+            </Text>
+          </PressScale>
+        </View>
+      )}
+
+      {error ? (
+        <Text style={[t.meta, { color: color.scaleBad, lineHeight: 17 }]}>{error}</Text>
+      ) : null}
+    </View>
+  );
+}
 
 const TAB_CLEARANCE = 118;
 
@@ -573,6 +639,8 @@ export default function Home() {
                       Edit my profile
                     </Text>
                   </PressScale>
+
+                  <AccountRow />
                 </View>
               ) : null}
             </View>
