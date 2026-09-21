@@ -30,9 +30,20 @@ function MixCard({ mix, onPlay, onEdit, playing }: {
   onEdit: () => void;
   playing: boolean;
 }) {
-  // A mix has no photograph of its own, so it borrows its first layer's.
+  /*
+    A mix has no photograph of its own, so it wears the ones it is made of:
+    up to three panels side by side, in the order the sounds were added.
+    Borrowing only the first layer's photo said "forest" for a mix of
+    forest, stream and pink noise — the picture named one ingredient and
+    hid the rest. A strip of them says "these, together", which is the
+    thing a mix actually is.
+  */
+  const panels = mix.layers
+    .slice(0, 3)
+    .map((l) => ({ key: l.id, art: artFor(l.id), sound: soundById(l.id) }))
+    .filter((p) => p.art);
+
   const lead = soundById(mix.layers[0]?.id ?? '');
-  const art = lead ? artFor(lead.id) : null;
   const colors = (lead?.colors ?? [color.violet, color.night]) as readonly [string, string];
   const count = mix.layers.length;
 
@@ -64,17 +75,37 @@ function MixCard({ mix, onPlay, onEdit, playing }: {
           colors={colors}
           start={{ x: 0.1, y: 0 }}
           end={{ x: 0.9, y: 1 }}
-          style={[StyleSheet.absoluteFill, { opacity: art ? 0.35 : 1 }]}
+          style={[StyleSheet.absoluteFill, { opacity: panels.length ? 0.35 : 1 }]}
         />
-        {art ? (
-          <Image
-            source={art}
-            style={[StyleSheet.absoluteFill, { width: '100%', height: '100%', opacity: 0.55 }]}
-            resizeMode="cover"
-          />
+
+        {/* The panels. A hairline of the ground colour between them, so the
+            seams read as a deliberate join rather than as one broken photo. */}
+        {panels.length ? (
+          <View style={[StyleSheet.absoluteFill, { flexDirection: 'row' }]}>
+            {panels.map((p, i) => (
+              <View
+                key={p.key}
+                style={{
+                  flex: 1,
+                  overflow: 'hidden',
+                  borderLeftWidth: i === 0 ? 0 : 1,
+                  borderLeftColor: 'rgba(7,10,22,0.55)',
+                }}
+              >
+                <Image
+                  source={p.art as number}
+                  // Held back further than a single-photo card: three
+                  // pictures at once is three times the brightness, and the
+                  // name has to stay readable over whatever lands here.
+                  style={[StyleSheet.absoluteFill, { width: '100%', height: '100%', opacity: 0.42 }]}
+                  resizeMode="cover"
+                />
+              </View>
+            ))}
+          </View>
         ) : null}
         <LinearGradient
-          colors={['rgba(7,10,22,0.10)', 'rgba(7,10,22,0.45)', 'rgba(7,10,22,0.90)'] as const}
+          colors={['rgba(7,10,22,0.22)', 'rgba(7,10,22,0.58)', 'rgba(7,10,22,0.94)'] as const}
           locations={[0, 0.5, 1]}
           style={StyleSheet.absoluteFill}
         />
