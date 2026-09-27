@@ -468,7 +468,13 @@ export default function Home() {
           <PressScale onPress={() => router.push('/player')}>
             <GlassCard r={radius.xl} style={{ minHeight: 168, padding: 20, justifyContent: 'space-between' }}>
               <NowPlayingBackdrop source={nowPlayingArt} />
-              <BreathingHalo tint={p.colors[0]} active={p.playing} />
+              {/*
+                The halo is for sounds with no photograph. Over artwork its
+                hard 220px edge cut a visible disc out of the picture, which
+                read as the image being badly cropped inside the card — the
+                photo is fine, the circle was sitting on top of it.
+              */}
+              {nowPlayingArt ? null : <BreathingHalo tint={p.colors[0]} active={p.playing} />}
               <Text style={[t.label, { color: color.ink58 }]}>
                 {p.playing ? 'Playing now' : 'Pick up where you left off'}
               </Text>
@@ -677,16 +683,18 @@ export default function Home() {
                     <SoundSuggestion id={alt.id} reason={alt.reason} lead={false} onPress={() => startNoise(alt.id)} />
                   </View>
 
-                  {/* Advice, set back in its own inset panel so it reads as
-                      guidance rather than as two more tappable rows. */}
+                  {/* Advice, sunk into the card rather than raised out of
+                      it: darker than the surface it sits on, so it reads as
+                      a recess behind the two tappable sounds above instead
+                      of competing with them. */}
                   <View
                     style={{
                       gap: 12,
                       padding: 14,
                       borderRadius: radius.md,
-                      backgroundColor: 'rgba(255,255,255,0.03)',
+                      backgroundColor: 'rgba(2,4,10,0.45)',
                       borderWidth: 1,
-                      borderColor: color.glassBorder,
+                      borderColor: 'rgba(255,255,255,0.05)',
                     }}
                   >
                     <Text style={[t.label, { color: color.ink58 }]}>How to use it</Text>
@@ -729,29 +737,10 @@ export default function Home() {
                     </View>
                   ) : null}
 
-                  {/* A full-width row with a real touch target. It was a 13px
-                      text link with no padding, well under 44pt. */}
-                  <View style={{ height: 1, backgroundColor: color.ink, opacity: 0.07 }} />
-                  <PressScale
-                    onPress={() => {
-                      setFlowMode('edit');
-                      router.push('/(onboarding)/sound');
-                    }}
-                    accessibilityRole="button"
-                    accessibilityLabel="Edit my tinnitus profile"
-                    style={{
-                      flexDirection: 'row',
-                      alignItems: 'center',
-                      gap: 10,
-                      minHeight: 44,
-                    }}
-                  >
-                    <Icon name="refresh" size={16} color={color.ink58} />
-                    <Text style={{ fontFamily: t.body.fontFamily, fontSize: 13.5, color: color.ink82, flex: 1 }}>
-                      Edit my answers
-                    </Text>
-                    <Icon name="chevronRight" size={15} color={color.ink58} />
-                  </PressScale>
+                  {/* Editing the profile lives in Account, under "My
+                      tinnitus" — this card is for tonight's sounds, and a
+                      second door to the same questionnaire only added
+                      weight to the thing you opened to get a sound from. */}
                 </View>
               ) : null}
             </View>
