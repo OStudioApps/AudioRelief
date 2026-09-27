@@ -1,6 +1,7 @@
 import React, { useEffect, useRef } from 'react';
 import { Animated, Easing, Image, StyleSheet, Text, View } from 'react-native';
-import { useRouter } from 'expo-router';
+import { Redirect, useRouter } from 'expo-router';
+import { useAuth } from '../src/auth';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { Aurora } from '../src/components/Aurora';
 import { PrimaryButton, SecondaryButton } from '../src/components/Glass';
@@ -89,6 +90,13 @@ function Orb() {
 export default function Welcome() {
   const router = useRouter();
   const insets = useSafeAreaInsets();
+  const auth = useAuth();
+
+  // A stored session means this person has been here before: skip the
+  // welcome and go straight into the app. Hold a blank screen while the
+  // session is read so the welcome does not flash first.
+  if (!auth.loaded) return <View style={{ flex: 1, backgroundColor: color.ground }} />;
+  if (auth.signedIn) return <Redirect href="/(tabs)/tonight" />;
 
   return (
     <View style={{ flex: 1, backgroundColor: color.ground }}>
