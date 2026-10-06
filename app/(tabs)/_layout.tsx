@@ -6,6 +6,8 @@ import { LinearGradient } from 'expo-linear-gradient';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { Icon, IconName } from '../../src/components/Icon';
 import { useToggleValue } from '../../src/components/Motion';
+import { MINI_PLAYER_H, MiniPlayer } from '../../src/components/MiniPlayer';
+import { useTrackPlayer } from '../../src/audio/tracks';
 import { color, radius, safe, type as t } from '../../src/theme';
 
 const ITEMS: Array<{ name: string; label: string; icon: IconName }> = [
@@ -84,6 +86,7 @@ function TabItem({
 /** Floating glass tab bar — 64px, 34px off the bottom, matching the design. */
 function GlassTabBar({ state, navigation }: TabBarProps) {
   const insets = useSafeAreaInsets();
+  const { current } = useTrackPlayer();
 
   return (
     <>
@@ -103,7 +106,7 @@ function GlassTabBar({ state, navigation }: TabBarProps) {
           left: 0,
           right: 0,
           bottom: 0,
-          height: Math.max(insets.bottom, safe.bottom) + 64 + 76,
+          height: Math.max(insets.bottom, safe.bottom) + 64 + 76 + (current ? MINI_PLAYER_H + 8 : 0),
         }}
       />
 
@@ -159,6 +162,9 @@ function GlassTabBar({ state, navigation }: TabBarProps) {
       </View>
       </View>
       </View>
+
+      {/* Whatever the Sounds tab is playing, docked above the bar on every tab. */}
+      <MiniPlayer />
     </>
   );
 }

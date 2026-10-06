@@ -1,41 +1,25 @@
-import React, { useEffect, useState } from 'react';
+import React, { useMemo, useRef, useState } from 'react';
 import {
   ActivityIndicator,
   Image,
+  Platform,
   RefreshControl,
   ScrollView,
   StyleSheet,
   Text,
+  TextInput,
   View,
 } from 'react-native';
-import { useAudioPlayer, useAudioPlayerStatus } from 'expo-audio';
 import { PressScale } from '../../src/components/Motion';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { LinearGradient } from 'expo-linear-gradient';
 import { Aurora } from '../../src/components/Aurora';
+import { GlassCard } from '../../src/components/Glass';
 import { Icon } from '../../src/components/Icon';
-import { OUTPUT_CEILING } from '../../src/audio/assets';
-import { formatLength, useLibrary } from '../../src/data/library';
-import { usePlayer } from '../../src/state';
+import { useTabClearance } from '../../src/components/MiniPlayer';
+import { useTrackPlayer } from '../../src/audio/tracks';
+import { formatLength, matchesQuery, trackColors, useLibrary } from '../../src/data/library';
 import { color, font, motion, radius, safe, type as t } from '../../src/theme';
-
-const TAB_CLEARANCE = 118;
-
-/** Card gradients, used behind artwork and in its place when there is none. */
-const PALETTE: ReadonlyArray<readonly [string, string]> = [
-  ['#8FA9E8', '#2E3E78'],
-  ['#69C4B4', '#1F5850'],
-  ['#A8CF7E', '#4A6528'],
-  ['#C9A7A0', '#5E3D38'],
-  ['#74D0D8', '#215E67'],
-  ['#A9B7D6', '#434F6E'],
-];
-
-function gradientFor(id: string) {
-  let h = 0;
-  for (let i = 0; i < id.length; i++) h = (h * 31 + id.charCodeAt(i)) | 0;
-  return PALETTE[Math.abs(h) % PALETTE.length];
-}
 
 function PlayBadge({ sounding }: { sounding: boolean }) {
   return (
@@ -56,52 +40,83 @@ function PlayBadge({ sounding }: { sounding: boolean }) {
   );
 }
 
+/** Filters the library by title and artist as you type. Same glass as the sign-in fields. */
+function SearchBar({ value, onChange }: { value: string; onChange: (v: string) => void }) {
+  const input = useRef<TextInput>(null);
+  return (
+    <GlassCard
+      r={radius.md}
+      style={{ minHeight: 48, flexDirection: 'row', alignItems: 'center', gap: 10, paddingLeft: 15, paddingRight: 6 }}
+    >
+      <Icon name="search" size={18} color={value ? color.ink : color.ink58} />
+      <TextInput
+        ref={input}
+        value={value}
+        onChangeText={onChange}
+        placeholder="Search sounds or artists"
+        placeholderTextColor={color.ink58}
+        accessibilityLabel="Search sounds"
+        returnKeyType="search"
+        autoCorrect={false}
+        autoCapitalize="none"
+        clearButtonMode="never"
+        style={{
+          flex: 1,
+          fontFamily: t.body.fontFamily,
+          fontSize: 14.5,
+          color: color.ink,
+          // Android centres poorly without this and clips descenders.
+          paddingVertical: Platform.OS === 'android' ? 10 : 0,
+          // Web: sit above the glass layers, no focus ring.
+          position: 'relative',
+          outlineStyle: 'none',
+        } as never}
+      />
+      {value ? (
+        <PressScale
+          onPress={() => {
+            onChange('');
+            input.current?.focus();
+          }}
+          accessibilityRole="button"
+          accessibilityLabel="Clear search"
+          hitSlop={6}
+          scaleTo={0.88}
+          style={{ width: 36, height: 36, alignItems: 'center', justifyContent: 'center' }}
+        >
+          <View
+            style={{
+              width: 22,
+              height: 22,
+              borderRadius: 11,
+              alignItems: 'center',
+              justifyContent: 'center',
+              backgroundColor: 'rgba(255,255,255,0.14)',
+            }}
+          >
+            <Icon name="close" size={12} color={color.ink} strokeWidth={2} />
+          </View>
+        </PressScale>
+      ) : null}
+    </GlassCard>
+  );
+}
+
 export default function Sounds() {
   const insets = useSafeAreaInsets();
-  const p = usePlayer();
   const lib = useLibrary();
+  const tp = useTrackPlayer();
+  const clearance = useTabClearance();
+  const [query, setQuery] = useState('');
 
-  /*
-    One streaming voice for everything on this screen, sounds and music alike,
-    so two never overlap. It also never overlaps the mixer: starting a sound
-    here pauses the mix, and starting the mix pauses this.
-  */
-  const player = useAudioPlayer(null);
-  const status = useAudioPlayerStatus(player);
-  const [currentId, setCurrentId] = useState<string | null>(null);
-  const isSounding = (id: string) => currentId === id && status.playing;
+  const results = useMemo(
+    () => lib.tracks.filter((s) => matchesQuery(s, query)),
+    [lib.tracks, query],
+  );
+  const searching = query.trim().length > 0;
 
-  useEffect(() => {
-    if (p.playing && status.playing) player.pause();
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [p.playing]);
-
-  useEffect(() => {
-    try {
-      player.volume = (p.volume / 100) * OUTPUT_CEILING;
-    } catch {
-      // not ready yet
-    }
-  }, [player, p.volume]);
-
-  const toggle = (id: string, url: string, loop: boolean) => {
-    try {
-      if (currentId === id) {
-        if (status.playing) player.pause();
-        else player.play();
-        return;
-      }
-      if (p.playing) p.togglePlay();
-      player.replace({ uri: url });
-      player.loop = loop;
-      player.volume = (p.volume / 100) * OUTPUT_CEILING;
-      player.play();
-      setCurrentId(id);
-    } catch {
-      setCurrentId(null);
-    }
-  };
-
+  const currentId = tp.current?.id ?? null;
+  const isSounding = (id: string) => currentId === id && tp.playing;
 
   const empty = (message: string) => (
     <Text style={[t.meta, { color: color.ink58, textAlign: 'center', marginTop: 32 }]}>{message}</Text>
@@ -131,17 +146,24 @@ export default function Sounds() {
             Sounds
           </Text>
           <Text style={[t.meta, { color: color.ink58, fontSize: 12 }]}>
-            {lib.tracks.length} sounds
+            {searching ? `${results.length} of ${lib.tracks.length}` : `${lib.tracks.length} sounds`}
           </Text>
         </View>
 
-        <View style={{ height: 18 }} />
+        <View style={{ height: 14 }} />
 
+        <View style={{ paddingHorizontal: safe.side }}>
+          <SearchBar value={query} onChange={setQuery} />
+        </View>
+
+        <View style={{ height: 16 }} />
 
         <ScrollView
           style={{ flex: 1 }}
           showsVerticalScrollIndicator={false}
-          contentContainerStyle={{ paddingHorizontal: safe.side, paddingBottom: TAB_CLEARANCE }}
+          keyboardShouldPersistTaps="handled"
+          keyboardDismissMode="on-drag"
+          contentContainerStyle={{ paddingHorizontal: safe.side, paddingBottom: clearance }}
           refreshControl={
             <RefreshControl refreshing={false} onRefresh={lib.reload} tintColor={color.ink58} />
           }
@@ -152,15 +174,19 @@ export default function Sounds() {
             empty(`Couldn't load the library. ${lib.error}`)
           ) : lib.tracks.length === 0 ? (
             empty('No sounds yet.')
+          ) : results.length === 0 ? (
+            empty(`No sounds match \u201C${query.trim()}\u201D.`)
           ) : (
             <View style={{ flexDirection: 'row', flexWrap: 'wrap', gap: 12 }}>
-              {lib.tracks.map((s) => {
+              {results.map((s) => {
                 const url = s.file_url;
                 const meta = [s.artist, formatLength(s.duration_seconds)].filter(Boolean).join(' · ');
                 return (
                   <PressScale
                     key={s.id}
-                    onPress={() => url && toggle(s.id, url, true)}
+                    onPress={() => url && tp.playFrom(results, s.id)}
+                    accessibilityRole="button"
+                    accessibilityLabel={`${isSounding(s.id) ? 'Pause' : 'Play'} ${s.title}`}
                     style={{
                       width: '47.5%',
                       flexGrow: 1,
@@ -173,7 +199,7 @@ export default function Sounds() {
                     }}
                   >
                     <LinearGradient
-                      colors={gradientFor(s.id)}
+                      colors={trackColors(s.id)}
                       start={{ x: 0.1, y: 0 }}
                       end={{ x: 0.9, y: 1 }}
                       style={[StyleSheet.absoluteFill, { opacity: s.cover_art_url ? 0.35 : 1 }]}

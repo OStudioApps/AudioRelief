@@ -8,6 +8,7 @@ import { GlassCard } from '../../src/components/Glass';
 import { Icon, IconName } from '../../src/components/Icon';
 import { LegalModal } from '../../src/components/LegalModal';
 import { PressScale } from '../../src/components/Motion';
+import { useTabClearance } from '../../src/components/MiniPlayer';
 import { CHARACTERS, TONES, WORST_WHEN } from '../../src/data/tinnitus';
 import { PRIVACY_POLICY, TERMS_OF_SERVICE } from '../../src/legal/content';
 import { setFlowMode } from '../../src/onboardingFlow';
@@ -16,7 +17,6 @@ import { errorMessage } from '../../src/lib/supabase';
 import { useTinnitus } from '../../src/tinnitus';
 import { color, font, glow, radius, safe, space, type as t } from '../../src/theme';
 
-const TAB_CLEARANCE = 118;
 
 /**
  * Account — the person's own corner of the app: who they are, what the app
@@ -109,6 +109,7 @@ function Section({ label, children }: { label: string; children: React.ReactNode
 export default function Account() {
   const router = useRouter();
   const insets = useSafeAreaInsets();
+  const TAB_CLEARANCE = useTabClearance();
   const tin = useTinnitus();
   /*
     The real session, not the device-local placeholder this screen was built

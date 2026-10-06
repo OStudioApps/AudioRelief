@@ -51,3 +51,42 @@ export function useLibrary() {
 
   return { tracks, loading, error, reload: load };
 }
+
+/** Card gradients, used behind artwork and in its place when there is none. */
+const PALETTE: ReadonlyArray<readonly [string, string]> = [
+  ['#8FA9E8', '#2E3E78'],
+  ['#69C4B4', '#1F5850'],
+  ['#A8CF7E', '#4A6528'],
+  ['#C9A7A0', '#5E3D38'],
+  ['#74D0D8', '#215E67'],
+  ['#A9B7D6', '#434F6E'],
+];
+
+/** A stable gradient per track, so it is the same colour on the card and in the player. */
+export function trackColors(id: string) {
+  let h = 0;
+  for (let i = 0; i < id.length; i++) h = (h * 31 + id.charCodeAt(i)) | 0;
+  return PALETTE[Math.abs(h) % PALETTE.length];
+}
+
+/** Lower-case, accent-free, so "Café" is found by "cafe". */
+function fold(s: string) {
+  return s.normalize('NFD').replace(/[̀-ͯ]/g, '').toLowerCase();
+}
+
+/** Every word of the query has to appear in the title or the artist. */
+export function matchesQuery(track: LibraryTrack, query: string): boolean {
+  const words = fold(query).split(/\s+/).filter(Boolean);
+  if (!words.length) return true;
+  const hay = fold(`${track.title} ${track.artist ?? ''}`);
+  return words.every((w) => hay.includes(w));
+}
+
+/** m:ss, or h:mm:ss past an hour — the clock under a scrub bar. */
+export function formatClock(seconds: number): string {
+  const s = Math.max(0, Math.floor(seconds || 0));
+  const h = Math.floor(s / 3600);
+  const m = Math.floor((s % 3600) / 60);
+  const sec = String(s % 60).padStart(2, '0');
+  return h ? `${h}:${String(m).padStart(2, '0')}:${sec}` : `${m}:${sec}`;
+}

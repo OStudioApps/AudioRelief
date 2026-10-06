@@ -7,6 +7,7 @@ import { Aurora } from '../../src/components/Aurora';
 import { GlassCard, RoundButton, SectionLabel } from '../../src/components/Glass';
 import { Icon } from '../../src/components/Icon';
 import { FadeIn, PressScale, useReducedMotion } from '../../src/components/Motion';
+import { useTabClearance } from '../../src/components/MiniPlayer';
 import { usePlayer } from '../../src/state';
 import { useTinnitus } from '../../src/tinnitus';
 import { artFor, MIXES, MIX_ART, NOISES, soundById } from '../../src/data/sounds';
@@ -22,7 +23,6 @@ import {
 import { setFlowMode } from '../../src/onboardingFlow';
 import { color, font, glow, motion, radius, rgba, safe, type as t } from '../../src/theme';
 
-const TAB_CLEARANCE = 118;
 
 /** Evening is the common case, but this app is used at 3am and at a desk too. */
 function greeting(): string {
@@ -344,6 +344,7 @@ function SoundSuggestion({
 export default function Home() {
   const router = useRouter();
   const insets = useSafeAreaInsets();
+  const TAB_CLEARANCE = useTabClearance();
   const p = usePlayer();
   const tin = useTinnitus();
 
