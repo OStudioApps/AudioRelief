@@ -110,7 +110,9 @@ export default function Player() {
   const p = usePlayer();
   // Not the selection id: a saved mix borrows its first sound's photograph.
   const art = artFor(p.artId);
-  const left = p.timerTotal > 0 ? Math.max(0, Math.min(1, p.timerRemaining / p.timerTotal)) : 0;
+  // How far through the session we are — the timeline fills as it runs.
+  const elapsedPct =
+    p.timerTotal > 0 ? Math.max(0, Math.min(1, 1 - p.timerRemaining / p.timerTotal)) : 0;
 
   // Starts at 0 so the first paint has no orb rather than an oversized one;
   // the real value lands on the next frame from onLayout.
@@ -280,14 +282,49 @@ export default function Player() {
               {formatDuration(p.timerRemaining)}
             </Text>
 
-            {/* Not an audio scrub — white noise has no position. This is the sleep timer. */}
-            <View style={{ height: 6, borderRadius: 999, backgroundColor: 'rgba(255,255,255,0.10)', overflow: 'hidden' }}>
-              <LinearGradient
-                colors={[color.accent, p.colors[0]]}
-                start={{ x: 0, y: 0 }}
-                end={{ x: 1, y: 0 }}
-                style={{ width: `${left * 100}%`, height: '100%', borderRadius: 999 }}
-              />
+            {/*
+              A timeline of the session, not an audio scrub — white noise
+              has no position to seek to. It runs left to right: filled
+              behind you, empty ahead, a playhead where you are now, and the
+              two ends labelled so the line says what it is measuring. It
+              used to be a bare bar that drained right-to-left, which read
+              as a battery.
+            */}
+            <View style={{ gap: 7 }}>
+              <View style={{ height: 14, justifyContent: 'center' }}>
+                <View style={{ height: 4, borderRadius: 999, backgroundColor: 'rgba(255,255,255,0.10)' }}>
+                  <LinearGradient
+                    colors={[color.accent, p.colors[0]]}
+                    start={{ x: 0, y: 0 }}
+                    end={{ x: 1, y: 0 }}
+                    style={{ width: `${elapsedPct * 100}%`, height: '100%', borderRadius: 999 }}
+                  />
+                </View>
+                {/* The playhead. Pulled back by half its width so its centre
+                    sits on the mark rather than its left edge. */}
+                <View
+                  pointerEvents="none"
+                  style={{
+                    position: 'absolute',
+                    left: `${elapsedPct * 100}%`,
+                    marginLeft: -6,
+                    width: 12,
+                    height: 12,
+                    borderRadius: 6,
+                    backgroundColor: color.ink,
+                    boxShadow: glow(color.accent, 0.45, 12, 0),
+                  }}
+                />
+              </View>
+
+              <View style={{ flexDirection: 'row', justifyContent: 'space-between' }}>
+                <Text style={[t.meta, { color: color.ink58, fontVariant: ['tabular-nums'] }]}>
+                  {formatDuration(p.timerTotal - p.timerRemaining)}
+                </Text>
+                <Text style={[t.meta, { color: color.ink58, fontVariant: ['tabular-nums'] }]}>
+                  {formatDuration(p.timerTotal)}
+                </Text>
+              </View>
             </View>
 
             <View style={{ flexDirection: 'row', gap: space.sm, marginTop: space.xs }}>
