@@ -7,12 +7,12 @@ import { Aurora } from '../../src/components/Aurora';
 import { GlassCard, PrimaryButton, RoundButton } from '../../src/components/Glass';
 import { Icon } from '../../src/components/Icon';
 import { PressScale } from '../../src/components/Motion';
+import { useTabClearance } from '../../src/components/MiniPlayer';
 import { artFor, soundById } from '../../src/data/sounds';
 import { SavedMix, useMixes } from '../../src/mixes';
 import { usePlayer } from '../../src/state';
 import { color, font, glow, motion, radius, safe, space, type as t } from '../../src/theme';
 
-const TAB_CLEARANCE = 118;
 
 /**
  * The person's own mixes.
@@ -175,6 +175,7 @@ function MixCard({ mix, onPlay, onEdit, playing }: {
 export default function Mixes() {
   const router = useRouter();
   const insets = useSafeAreaInsets();
+  const TAB_CLEARANCE = useTabClearance();
   const p = usePlayer();
   const { mixes, loaded } = useMixes();
 

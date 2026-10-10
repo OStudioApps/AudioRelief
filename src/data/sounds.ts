@@ -1,3 +1,4 @@
+import type { SoundIconName } from '../components/SoundIcon';
 import { soundColor, SoundKey } from '../theme';
 
 export type Category = 'noise' | 'rain' | 'nature' | 'room';
@@ -7,29 +8,31 @@ export type Sound = {
   name: string;
   meta: string;
   cat: Category;
+  /** Same field and values as `sounds.icon` on the dashboard. */
+  icon: SoundIconName;
   colors: readonly [string, string];
 };
 
 const c = (k: SoundKey) => soundColor[k] as unknown as readonly [string, string];
 
 export const SOUNDS: Sound[] = [
-  { id: 'rain-roof', name: 'Rain on a tin roof', meta: 'Field · 41 min', cat: 'rain', colors: c('rain') },
-  { id: 'white', name: 'White noise', meta: 'Generated · steady', cat: 'noise', colors: c('white') },
-  { id: 'ocean', name: 'Ocean swell', meta: 'Field · 62 min', cat: 'nature', colors: c('ocean') },
-  { id: 'fan', name: 'Box fan', meta: 'Generated · steady', cat: 'room', colors: c('fan') },
-  { id: 'brown', name: 'Brown noise', meta: 'Generated · steady', cat: 'noise', colors: c('brown') },
-  { id: 'forest', name: 'Forest at dusk', meta: 'Field · 55 min', cat: 'nature', colors: c('forest') },
-  { id: 'pink', name: 'Pink noise', meta: 'Generated · steady', cat: 'noise', colors: c('pink') },
-  { id: 'green', name: 'Green noise', meta: 'Generated · steady', cat: 'noise', colors: c('green') },
-  { id: 'rain-window', name: 'Rain on a window', meta: 'Field · 38 min', cat: 'rain', colors: ['#8FA9E8', '#2E3E78'] },
-  { id: 'thunder', name: 'Distant thunder', meta: 'Field · 47 min', cat: 'rain', colors: ['#7FA2C4', '#26405C'] },
-  { id: 'rain-forest', name: 'Rain in a forest', meta: 'Field · 52 min', cat: 'rain', colors: ['#69C4B4', '#1F5850'] },
-  { id: 'stream', name: 'Mountain stream', meta: 'Field · 44 min', cat: 'nature', colors: ['#74D0D8', '#215E67'] },
-  { id: 'crickets', name: 'Crickets and wind', meta: 'Field · 60 min', cat: 'nature', colors: ['#A8CF7E', '#4A6528'] },
-  { id: 'ac', name: 'Air conditioner', meta: 'Generated · steady', cat: 'room', colors: ['#A9B7D6', '#434F6E'] },
-  { id: 'radiator', name: 'Old radiator', meta: 'Field · 36 min', cat: 'room', colors: ['#C9A7A0', '#5E3D38'] },
-  { id: 'train', name: 'Night train', meta: 'Field · 58 min', cat: 'room', colors: c('hum') },
-  { id: 'hum', name: 'Deep hum', meta: 'Generated · seamless', cat: 'noise', colors: c('hum') },
+  { id: 'rain-roof', name: 'Rain on a tin roof', meta: 'Field · 41 min', cat: 'rain', icon: 'CloudRain', colors: c('rain') },
+  { id: 'white', name: 'White noise', meta: 'Generated · steady', cat: 'noise', icon: 'Waves', colors: c('white') },
+  { id: 'ocean', name: 'Ocean swell', meta: 'Field · 62 min', cat: 'nature', icon: 'Waves', colors: c('ocean') },
+  { id: 'fan', name: 'Box fan', meta: 'Generated · steady', cat: 'room', icon: 'Fan', colors: c('fan') },
+  { id: 'brown', name: 'Brown noise', meta: 'Generated · steady', cat: 'noise', icon: 'Waves', colors: c('brown') },
+  { id: 'forest', name: 'Forest at dusk', meta: 'Field · 55 min', cat: 'nature', icon: 'Tree', colors: c('forest') },
+  { id: 'pink', name: 'Pink noise', meta: 'Generated · steady', cat: 'noise', icon: 'Waves', colors: c('pink') },
+  { id: 'green', name: 'Green noise', meta: 'Generated · steady', cat: 'noise', icon: 'Leaf', colors: c('green') },
+  { id: 'rain-window', name: 'Rain on a window', meta: 'Field · 38 min', cat: 'rain', icon: 'Drop', colors: ['#8FA9E8', '#2E3E78'] },
+  { id: 'thunder', name: 'Distant thunder', meta: 'Field · 47 min', cat: 'rain', icon: 'Lightning', colors: ['#7FA2C4', '#26405C'] },
+  { id: 'rain-forest', name: 'Rain in a forest', meta: 'Field · 52 min', cat: 'rain', icon: 'CloudRain', colors: ['#69C4B4', '#1F5850'] },
+  { id: 'stream', name: 'Mountain stream', meta: 'Field · 44 min', cat: 'nature', icon: 'Drop', colors: ['#74D0D8', '#215E67'] },
+  { id: 'crickets', name: 'Crickets and wind', meta: 'Field · 60 min', cat: 'nature', icon: 'Wind', colors: ['#A8CF7E', '#4A6528'] },
+  { id: 'ac', name: 'Air conditioner', meta: 'Generated · steady', cat: 'room', icon: 'Fan', colors: ['#A9B7D6', '#434F6E'] },
+  { id: 'radiator', name: 'Old radiator', meta: 'Field · 36 min', cat: 'room', icon: 'Fire', colors: ['#C9A7A0', '#5E3D38'] },
+  { id: 'train', name: 'Night train', meta: 'Field · 58 min', cat: 'room', icon: 'Train', colors: c('hum') },
+  { id: 'hum', name: 'Deep hum', meta: 'Generated · seamless', cat: 'noise', icon: 'Moon', colors: c('hum') },
 ];
 
 export const CATEGORIES: Array<{ id: Category | 'all'; label: string }> = [

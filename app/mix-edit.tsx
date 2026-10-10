@@ -15,6 +15,7 @@ import { Aurora } from '../src/components/Aurora';
 import { AddSoundSheet } from '../src/components/AddSoundSheet';
 import { GlassCard, PrimaryButton, RoundButton } from '../src/components/Glass';
 import { Icon } from '../src/components/Icon';
+import { SoundIcon } from '../src/components/SoundIcon';
 import { PressScale } from '../src/components/Motion';
 import { soundById } from '../src/data/sounds';
 import { MixLayer, useMixes } from '../src/mixes';
@@ -132,8 +133,10 @@ export default function MixEdit() {
                         colors={s.colors as unknown as readonly [string, string]}
                         start={{ x: 0.1, y: 0 }}
                         end={{ x: 1, y: 1 }}
-                        style={{ width: 34, height: 34, borderRadius: radius.xs }}
-                      />
+                        style={{ width: 34, height: 34, borderRadius: radius.xs, alignItems: 'center', justifyContent: 'center' }}
+                      >
+                        <SoundIcon name={s.icon} size={17} color="rgba(255,255,255,0.85)" />
+                      </LinearGradient>
                       <View style={{ flex: 1, gap: 2 }}>
                         <Text style={[t.card, { color: color.ink }]} numberOfLines={1}>{s.name}</Text>
                         <Text style={[t.meta, { color: color.ink58 }]} numberOfLines={1}>{s.meta}</Text>

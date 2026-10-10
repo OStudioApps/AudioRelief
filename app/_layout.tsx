@@ -17,6 +17,7 @@ import { SessionRecorder } from '../src/audio/recorder';
 import { AuthProvider } from '../src/auth';
 import { PlayerProvider } from '../src/state';
 import { SoundEngine } from '../src/audio/engine';
+import { TrackPlayerProvider } from '../src/audio/tracks';
 import { TinnitusProvider } from '../src/tinnitus';
 import { SampleProvider } from '../src/components/SamplePlayer';
 import { color } from '../src/theme';
@@ -47,6 +48,9 @@ export default function RootLayout() {
           {/* Same reason, and it needs the history store above it: this is
               what turns listening into the numbers on the dashboard. */}
           <SessionRecorder />
+          {/* The Sounds library's player. Inside PlayerProvider so it and the
+              mix can hand the speaker to each other. */}
+          <TrackPlayerProvider>
           <TinnitusProvider>
               <MixesProvider>
                 <SampleProvider>
@@ -65,6 +69,7 @@ export default function RootLayout() {
                     <Stack.Screen name="(onboarding)" options={{ animation: 'none' }} />
                     <Stack.Screen name="(tabs)" />
                     <Stack.Screen name="player" options={{ animation: 'slide_from_bottom' }} />
+                    <Stack.Screen name="track" options={{ animation: 'slide_from_bottom' }} />
                     <Stack.Screen name="dashboard" options={{ animation: 'slide_from_bottom' }} />
                     {/* Building a mix is a task you come back out of, so it rises over
                         the library rather than replacing it sideways. */}
@@ -73,6 +78,7 @@ export default function RootLayout() {
                 </SampleProvider>
               </MixesProvider>
           </TinnitusProvider>
+          </TrackPlayerProvider>
         </PlayerProvider>
         </HistoryProvider>
       </AuthProvider>

@@ -26,11 +26,17 @@ import {
   MagnifyingGlass,
   Minus,
   Moon,
+  MoonStars,
   Pause,
   Play,
   Plus,
+  Repeat,
+  RepeatOnce,
   ShieldCheck,
+  Shuffle,
   SignOut,
+  SkipBack,
+  SkipForward,
   SlidersHorizontal,
   SquaresFour,
   SpeakerHigh,
@@ -38,6 +44,7 @@ import {
   SpeakerNone,
   SpeakerSlash,
   Sun,
+  Timer,
   Trash,
   Tree,
   User,
@@ -110,9 +117,23 @@ const ICONS: Record<string, PhosphorIcon> = {
   document: FileText,
   signOut: SignOut,
   trash: Trash,
+  // Track player.
+  shuffle: Shuffle,
+  repeat: Repeat,
+  repeatOne: RepeatOnce,
+  sleepTimer: MoonStars,
+  timer: Timer,
 };
 
-export type IconName = keyof typeof ICONS | 'play' | 'pause';
+/** Transport glyphs read as solid shapes, the way every music player draws them. */
+const FILLED: Record<string, PhosphorIcon> = {
+  play: Play,
+  pause: Pause,
+  skipBack: SkipBack,
+  skipForward: SkipForward,
+};
+
+export type IconName = keyof typeof ICONS | keyof typeof FILLED;
 
 /**
  * Phosphor has no numeric stroke width, only a `weight` enum. Call sites
@@ -139,8 +160,9 @@ export function Icon({
 }) {
   const wrap = SVG_LAYER as ViewStyle;
 
-  if (name === 'play' || name === 'pause') {
-    const Glyph = name === 'play' ? Play : Pause;
+  const Solid = FILLED[name];
+  if (Solid) {
+    const Glyph = Solid;
     return (
       <View style={wrap}>
         <Glyph size={size} color={tint} weight="fill" />

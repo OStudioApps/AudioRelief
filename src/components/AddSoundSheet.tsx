@@ -8,6 +8,7 @@ import { color, font, radius, safe, type as t } from '../theme';
 import { Chip, RoundButton } from './Glass';
 import { PressScale } from './Motion';
 import { Icon } from './Icon';
+import { SoundIcon } from './SoundIcon';
 
 /**
  * The app's own sound gallery, for adding a layer to the mix.
@@ -165,8 +166,10 @@ export function AddSoundSheet({
                       colors={s.colors as unknown as readonly [string, string]}
                       start={{ x: 0.1, y: 0 }}
                       end={{ x: 1, y: 1 }}
-                      style={{ width: 38, height: 38, borderRadius: radius.xs }}
-                    />
+                      style={{ width: 38, height: 38, borderRadius: radius.xs, alignItems: 'center', justifyContent: 'center' }}
+                    >
+                      <SoundIcon name={s.icon} size={18} color="rgba(255,255,255,0.85)" />
+                    </LinearGradient>
                     <View style={{ flex: 1, gap: 2 }}>
                       <Text style={[t.card, { color: color.ink, fontSize: 14.5 }]}>{s.name}</Text>
                       <Text style={[t.meta, { color: color.ink58 }]}>{s.meta}</Text>
