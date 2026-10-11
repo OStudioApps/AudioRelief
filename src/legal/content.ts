@@ -58,7 +58,7 @@ export const TERMS_OF_SERVICE: LegalDoc = {
     {
       heading: '6. Content and accounts you connect',
       body:
-        'If you sign in with Apple or Google, you are also bound by their terms for that sign-in method. We only receive the account information those services choose to share with us for the purpose of creating your AudioRelief account.',
+        'If you sign in with Google, you are also bound by Google’s terms for that sign-in method. We only receive the account information Google chooses to share with us for the purpose of creating your AudioRelief account.',
     },
     {
       heading: '7. Acceptable use',
@@ -112,7 +112,7 @@ export const PRIVACY_POLICY: LegalDoc = {
     {
       heading: '2. What we collect',
       body:
-        'Account information: the email address and password you provide, or the limited profile information Apple or Google shares with us if you sign in that way. Sound and mix preferences: the sounds, mixes, volumes and timers you set, so the app can restore them next time you open it. Tinnitus profile [PLANNED]: if you complete a pitch-matching or symptom check-in, the frequency, character and impact information you enter. This is health-related information and we treat it with extra care — see section 4. Whether you use AudioRelief for tinnitus: your yes-or-no answer to that question when you first open the app. It is kept on your device and, once you sign in, saved with your account so it follows you to a new phone. A "yes" is health-related information too — see section 4. Usage information: general app usage such as which screens you open, so we can find and fix problems; we do not track this to build an advertising profile of you. Device information: basic technical details (device type, OS version, app version) needed to keep the app working correctly.',
+        'Account information: the email address and password you provide, or the limited profile information Google shares with us if you sign in that way. Sound and mix preferences: the sounds, mixes, volumes and timers you set, so the app can restore them next time you open it. Tinnitus profile [PLANNED]: if you complete a pitch-matching or symptom check-in, the frequency, character and impact information you enter. This is health-related information and we treat it with extra care — see section 4. Whether you use AudioRelief for tinnitus: your yes-or-no answer to that question when you first open the app. It is kept on your device and, once you sign in, saved with your account so it follows you to a new phone. A "yes" is health-related information too — see section 4. Usage information: general app usage such as which screens you open, so we can find and fix problems; we do not track this to build an advertising profile of you. Device information: basic technical details (device type, OS version, app version) needed to keep the app working correctly.',
     },
     {
       heading: '3. What we do not collect',
@@ -137,7 +137,7 @@ export const PRIVACY_POLICY: LegalDoc = {
     {
       heading: '7. Who we share it with',
       body:
-        'We do not sell your personal information. We share it only with: service providers who help us run the app under contracts that limit them to our instructions (for example, cloud hosting or crash reporting, once in use — [LIST PROVIDERS]); Apple or Google, only as needed to authenticate your sign-in; and anyone we are legally required to share it with, such as in response to a valid legal request.',
+        'We do not sell your personal information. We share it only with: service providers who help us run the app under contracts that limit them to our instructions (for example, cloud hosting or crash reporting, once in use — [LIST PROVIDERS]); Google, only as needed to authenticate your sign-in; and anyone we are legally required to share it with, such as in response to a valid legal request.',
     },
     {
       heading: '8. How long we keep it',

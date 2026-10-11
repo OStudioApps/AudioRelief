@@ -1,7 +1,54 @@
 import type { Session } from '@supabase/supabase-js';
 import React, { createContext, useCallback, useContext, useEffect, useMemo, useState } from 'react';
+import { Platform } from 'react-native';
+import * as Linking from 'expo-linking';
+import * as WebBrowser from 'expo-web-browser';
 
 import { isSupabaseConfigured, supabase } from './lib/supabase';
+
+/*
+  Web only: when this bundle loads inside the popup an auth session opened,
+  hand the result back to the opener and close. A no-op everywhere else.
+*/
+WebBrowser.maybeCompleteAuthSession();
+
+/**
+ * Where Google sends the person back to, by way of Supabase. Every value this
+ * returns has to be on the allow list in Supabase → Authentication → URL
+ * Configuration → Redirect URLs:
+ *
+ *  - Expo Go:      exp://<your LAN IP>:8081/--/oauth-callback  (allow `exp://**`)
+ *  - Dev / store:  audiorelief://oauth-callback
+ *  - Web:          http://localhost:8081/oauth-callback
+ */
+export const OAUTH_REDIRECT = Linking.createURL('oauth-callback');
+
+/**
+ * Reads the session out of the URL Supabase redirected to. It arrives in the
+ * fragment for the implicit flow (#access_token=…&refresh_token=…) and as a
+ * query `code` for PKCE, so both are handled. Errors come back as params too.
+ */
+async function sessionFromRedirect(url: string) {
+  const parsed = new URL(url);
+  const params = new URLSearchParams(parsed.hash.replace(/^#/, ''));
+  parsed.searchParams.forEach((v, k) => params.set(k, v));
+
+  const failure = params.get('error_description') ?? params.get('error');
+  if (failure) throw new Error(failure.replace(/\+/g, ' '));
+
+  const code = params.get('code');
+  if (code) {
+    const { error } = await supabase.auth.exchangeCodeForSession(code);
+    if (error) throw error;
+    return;
+  }
+
+  const access_token = params.get('access_token');
+  const refresh_token = params.get('refresh_token');
+  if (!access_token || !refresh_token) throw new Error('Google sign-in did not return a session.');
+  const { error } = await supabase.auth.setSession({ access_token, refresh_token });
+  if (error) throw error;
+}
 
 /**
  * Who is signed in, if anyone.
@@ -36,6 +83,12 @@ type Ctx = {
   signIn: (email: string, password: string) => Promise<void>;
   /** Resolves true when Supabase sent a confirmation email instead of a session. */
   signUp: (email: string, password: string) => Promise<boolean>;
+  /**
+   * Google through Supabase. Resolves true once signed in, false if the person
+   * closed the sheet. On web the page navigates away to Google and back to
+   * /oauth-callback, so the promise never settles there.
+   */
+  signInWithGoogle: () => Promise<boolean>;
   signOut: () => Promise<void>;
 };
 
@@ -120,6 +173,38 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     return data.session === null;
   }, []);
 
+  const signInWithGoogle = useCallback(async () => {
+    if (Platform.OS === 'web') {
+      const { error } = await supabase.auth.signInWithOAuth({
+        provider: 'google',
+        options: { redirectTo: `${window.location.origin}/oauth-callback` },
+      });
+      if (error) throw error;
+      return false;
+    }
+
+    // Ask Supabase for Google's URL without letting it navigate anywhere —
+    // native has nothing to navigate. The auth session opens it instead and
+    // closes itself the moment Google redirects back to OAUTH_REDIRECT.
+    const { data, error } = await supabase.auth.signInWithOAuth({
+      provider: 'google',
+      options: {
+        redirectTo: OAUTH_REDIRECT,
+        skipBrowserRedirect: true,
+        // Always offer the account picker, so a shared phone is not locked
+        // into whoever signed in to Google last.
+        queryParams: { prompt: 'select_account' },
+      },
+    });
+    if (error) throw error;
+    if (!data.url) throw new Error('Supabase did not return a Google sign-in URL.');
+
+    const result = await WebBrowser.openAuthSessionAsync(data.url, OAUTH_REDIRECT);
+    if (result.type !== 'success') return false;
+    await sessionFromRedirect(result.url);
+    return true;
+  }, []);
+
   const signOut = useCallback(async () => {
     const { error } = await supabase.auth.signOut();
     if (error) throw error;
@@ -136,9 +221,10 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
       configured: isSupabaseConfigured,
       signIn,
       signUp,
+      signInWithGoogle,
       signOut,
     }),
-    [session, profile, loaded, signIn, signUp, signOut],
+    [session, profile, loaded, signIn, signUp, signInWithGoogle, signOut],
   );
 
   return <AuthContext.Provider value={value}>{children}</AuthContext.Provider>;

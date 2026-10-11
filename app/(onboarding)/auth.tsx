@@ -13,7 +13,7 @@ import { PressScale, useToggleValue } from '../../src/components/Motion';
 import { useLocalSearchParams, useRouter } from 'expo-router';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { Aurora } from '../../src/components/Aurora';
-import { AppleGlyph, GoogleGlyph } from '../../src/components/BrandIcons';
+import { GoogleGlyph } from '../../src/components/BrandIcons';
 import { GlassCard, PrimaryButton, RoundButton, SecondaryButton } from '../../src/components/Glass';
 import { Icon } from '../../src/components/Icon';
 import { LegalModal } from '../../src/components/LegalModal';
@@ -76,7 +76,7 @@ function Field({
 export default function Auth() {
   const router = useRouter();
   const insets = useSafeAreaInsets();
-  const { signIn, signUp, configured } = useAuth();
+  const { signIn, signUp, signInWithGoogle, configured } = useAuth();
 
   const params = useLocalSearchParams<{ mode?: string }>();
   const [mode, setMode] = useState<'up' | 'in'>(params.mode === 'in' ? 'in' : 'up');
@@ -89,6 +89,7 @@ export default function Auth() {
   const [password, setPassword] = useState('');
   const [reveal, setReveal] = useState(false);
   const [busy, setBusy] = useState(false);
+  const [googleBusy, setGoogleBusy] = useState(false);
   const [error, setError] = useState<string | null>(null);
   /** Set when sign-up needs the person to click a link before they can sign in. */
   const [checkInbox, setCheckInbox] = useState(false);
@@ -141,6 +142,24 @@ export default function Auth() {
       setError(errorMessage(e));
     } finally {
       setBusy(false);
+    }
+  }
+
+  async function google() {
+    if (busy || googleBusy) return;
+    setError(null);
+    if (!configured) {
+      setError('This build has no Supabase keys, so accounts are unavailable.');
+      return;
+    }
+    setGoogleBusy(true);
+    try {
+      // False when the person closed the Google sheet — not an error, just stay here.
+      if (await signInWithGoogle()) router.replace('/(tabs)/tonight');
+    } catch (e) {
+      setError(errorMessage(e));
+    } finally {
+      setGoogleBusy(false);
     }
   }
 
@@ -257,19 +276,13 @@ export default function Auth() {
 
             <View style={{ height: 20 }} />
 
-            {/* Apple and Google sign-in placeholders */}
-            <View style={{ gap: 10, opacity: 0.38 }} pointerEvents="none">
-              <PrimaryButton
-                label="Continue with Apple"
-                tint="rgba(255,255,255,0.92)"
-                left={<AppleGlyph size={22} color={color.onAccent} />}
-              />
-              <SecondaryButton label="Continue with Google" left={<GoogleGlyph size={18} />} />
-            </View>
-            <View style={{ height: 8 }} />
-            <Text style={[t.meta, { color: color.ink58, textAlign: 'center', fontSize: 12 }]}>
-              Apple and Google sign-in are coming soon.
-            </Text>
+            <SecondaryButton
+              label={googleBusy ? 'Opening Google…' : 'Continue with Google'}
+              onPress={google}
+              left={
+                googleBusy ? <ActivityIndicator size="small" color={color.ink82} /> : <GoogleGlyph size={18} />
+              }
+            />
 
             <View style={{ height: 20 }} />
 

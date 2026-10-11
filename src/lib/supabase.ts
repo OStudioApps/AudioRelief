@@ -97,8 +97,10 @@ export const supabase: SupabaseClient = createClient(
       storage: sessionStore,
       autoRefreshToken: true,
       persistSession: true,
-      // No URL bar on native; OAuth deep links would be handled separately.
-      detectSessionInUrl: false,
+      // Web: Google sends the browser back with the session in the URL, and
+      // supabase-js picks it up from there. Native has no URL bar — the
+      // redirect is caught by the auth session in src/auth.tsx instead.
+      detectSessionInUrl: Platform.OS === 'web',
     },
   },
 );

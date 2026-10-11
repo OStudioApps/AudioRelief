@@ -43,7 +43,8 @@
       "expo-audio",
       "expo-asset",
       "expo-status-bar",
-      "expo-secure-store"
+      "expo-secure-store",
+      "expo-web-browser"
     ],
     "scheme": "audiorelief",
     "backgroundColor": "#070A16"
