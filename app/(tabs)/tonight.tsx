@@ -429,7 +429,10 @@ export default function Home() {
         */}
         {!tin.loaded ? (
           <GlassCard r={radius.lg} style={{ minHeight: 84 }} />
-        ) : !tin.hasProfile ? (
+        ) : !tin.hasProfile && !tin.noTinnitus ? (
+          // Not shown to someone who said they do not have tinnitus: asking
+          // them to describe "theirs" on every launch would be nagging. They
+          // can still set a profile up from Account.
           <FadeIn delay={60}>
             <GlassCard r={radius.lg} style={{ padding: 18, gap: 12 }}>
               <Text style={[t.card, { color: color.ink, fontSize: 15.5 }]}>
@@ -463,7 +466,7 @@ export default function Home() {
 
         {/* The day count now lives with the profile card at the foot of the
             page, so the top opens straight onto what is playing. */}
-        {!tin.loaded || !tin.hasProfile ? <View style={{ height: 20 }} /> : null}
+        {!tin.loaded || (!tin.hasProfile && !tin.noTinnitus) ? <View style={{ height: 20 }} /> : null}
 
         <FadeIn delay={140}>
           <PressScale onPress={() => router.push('/player')}>

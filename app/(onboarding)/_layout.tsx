@@ -91,8 +91,11 @@ export default function OnboardingLayout() {
   const pathname = usePathname();
 
   const step = STEP_BY_ROUTE[pathname];
+  // /start is the question before the steps: a way back, but no bar, since
+  // answering "no" means there are no steps to show progress through.
+  const backOnly = pathname === '/start';
   // /auth lives in this group but is not a step — it brings its own frame.
-  const showHeader = step !== undefined;
+  const showHeader = step !== undefined || backOnly;
 
   return (
     <View style={{ flex: 1, backgroundColor: color.ground }}>
@@ -133,7 +136,7 @@ export default function OnboardingLayout() {
           <RoundButton onPress={() => router.back()}>
             <Icon name="chevronLeft" />
           </RoundButton>
-          <StepBar step={step} />
+          {step !== undefined ? <StepBar step={step} /> : null}
         </View>
       ) : null}
     </View>

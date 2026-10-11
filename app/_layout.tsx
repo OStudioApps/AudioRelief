@@ -19,6 +19,7 @@ import { PlayerProvider } from '../src/state';
 import { SoundEngine } from '../src/audio/engine';
 import { TrackPlayerProvider } from '../src/audio/tracks';
 import { TinnitusProvider } from '../src/tinnitus';
+import { TinnitusAccountSync } from '../src/accountSync';
 import { SampleProvider } from '../src/components/SamplePlayer';
 import { color } from '../src/theme';
 
@@ -52,6 +53,9 @@ export default function RootLayout() {
               mix can hand the speaker to each other. */}
           <TrackPlayerProvider>
           <TinnitusProvider>
+              {/* Needs both the session above and the profile around it: it
+                  carries the "do you have tinnitus?" answer between them. */}
+              <TinnitusAccountSync />
               <MixesProvider>
                 <SampleProvider>
                   <StatusBar style="light" />
