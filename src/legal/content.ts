@@ -112,7 +112,7 @@ export const PRIVACY_POLICY: LegalDoc = {
     {
       heading: '2. What we collect',
       body:
-        'Account information: the email address and password you provide, or the limited profile information Apple or Google shares with us if you sign in that way. Sound and mix preferences: the sounds, mixes, volumes and timers you set, so the app can restore them next time you open it. Tinnitus profile [PLANNED]: if you complete a pitch-matching or symptom check-in, the frequency, character and impact information you enter. This is health-related information and we treat it with extra care — see section 4. Usage information: general app usage such as which screens you open, so we can find and fix problems; we do not track this to build an advertising profile of you. Device information: basic technical details (device type, OS version, app version) needed to keep the app working correctly.',
+        'Account information: the email address and password you provide, or the limited profile information Apple or Google shares with us if you sign in that way. Sound and mix preferences: the sounds, mixes, volumes and timers you set, so the app can restore them next time you open it. Tinnitus profile [PLANNED]: if you complete a pitch-matching or symptom check-in, the frequency, character and impact information you enter. This is health-related information and we treat it with extra care — see section 4. Whether you use AudioRelief for tinnitus: your yes-or-no answer to that question when you first open the app. It is kept on your device and, once you sign in, saved with your account so it follows you to a new phone. A "yes" is health-related information too — see section 4. Usage information: general app usage such as which screens you open, so we can find and fix problems; we do not track this to build an advertising profile of you. Device information: basic technical details (device type, OS version, app version) needed to keep the app working correctly.',
     },
     {
       heading: '3. What we do not collect',
@@ -132,7 +132,7 @@ export const PRIVACY_POLICY: LegalDoc = {
     {
       heading: '6. Where your information is stored',
       body:
-        'Today, your mixes, timers and settings are stored only on your device — we do not currently operate a server that stores them. [Once account sync ships: your information will be stored on servers located in [REGION], protected in transit and at rest with industry-standard encryption.] This section should be corrected the moment that changes — it should always describe what actually happens, not what is planned.',
+        'Today, your mixes, timers, settings and the answers in your tinnitus profile are stored only on your device — we do not currently operate a server that stores them. The exceptions are your account itself and your yes-or-no answer to whether you use the app for tinnitus, which are stored with our account provider ([PROVIDER], servers in [REGION]). [Once account sync ships: your information will be stored on servers located in [REGION], protected in transit and at rest with industry-standard encryption.] This section should be corrected the moment that changes — it should always describe what actually happens, not what is planned.',
     },
     {
       heading: '7. Who we share it with',

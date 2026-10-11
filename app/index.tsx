@@ -148,7 +148,9 @@ export default function Welcome() {
         <FadeIn delay={360} style={{ gap: 10 }}>
           <PrimaryButton label="Get started" onPress={() => {
             setFlowMode('firstRun');
-            router.push('/(onboarding)/sound');
+            // One question first: the questionnaire is only for people with
+            // tinnitus, and everyone else goes straight to an account.
+            router.push('/(onboarding)/start');
           }} />
           <SecondaryButton label="I already have an account" onPress={() => router.push('/(onboarding)/auth')} />
           <View style={{ height: 4 }} />

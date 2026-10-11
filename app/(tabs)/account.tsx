@@ -125,6 +125,9 @@ export default function Account() {
   // Two taps to wipe the profile, rather than a native Alert — Alert does
   // nothing on web, and this has to be equally undoable everywhere.
   const [confirmWipe, setConfirmWipe] = useState(false);
+  // Saying "no" deletes the answers too, so it gets the same second tap —
+  // but only when there are answers to lose.
+  const [confirmNo, setConfirmNo] = useState(false);
 
   const version = Constants.expoConfig?.version ?? '1.0.0';
 
@@ -220,7 +223,7 @@ export default function Account() {
               {!configured
                 ? 'This build has no Supabase keys, so accounts are unavailable. The app works without one.'
                 : signedIn
-                  ? 'An account carries your account to a new phone. Your tinnitus profile and your mixes are kept on this device and are not uploaded.'
+                  ? 'An account carries your place to a new phone, and remembers whether you use the app for tinnitus. Your tinnitus answers and your mixes are kept on this device and are not uploaded.'
                   : 'You do not need one. Every sound, mix and timer works signed out — an account is for keeping your place if you change phone.'}
             </Text>
           </GlassCard>
@@ -248,13 +251,37 @@ export default function Account() {
                 />
               </>
             ) : (
+              // The same door for two people: someone who has not answered
+              // yet, and someone who said "no" at the start and has since
+              // changed their mind.
               <Row
                 icon="brain"
-                label="Set up my profile"
+                label={tin.noTinnitus ? 'I have tinnitus' : 'Set up my profile'}
                 // Kept to one line's worth of words rather than truncated.
-                note="Two minutes — it shapes your sound picks"
+                note={tin.noTinnitus ? 'A few questions for matched sounds' : 'Two minutes — it shapes your sound picks'}
                 onPress={editProfile}
                 first
+              />
+            )}
+            {/*
+              The way back out. The first question of the app promises the
+              answer can be changed here, and until this row existed that was
+              only true in one direction.
+            */}
+            {tin.noTinnitus ? null : (
+              <Row
+                icon="moon"
+                label={confirmNo ? 'Tap again to confirm' : 'I do not have tinnitus'}
+                note={confirmNo ? 'This deletes your answers from this phone' : 'Hides the tinnitus parts of the app'}
+                danger={confirmNo}
+                onPress={() => {
+                  if (tin.hasProfile && !confirmNo) {
+                    setConfirmNo(true);
+                    return;
+                  }
+                  tin.setHasTinnitus(false);
+                  setConfirmNo(false);
+                }}
               />
             )}
           </Section>

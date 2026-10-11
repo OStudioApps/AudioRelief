@@ -11,7 +11,9 @@ import { isSupabaseConfigured, supabase } from './lib/supabase';
  * navigation; it only tells the UI whether there is an account to show.
  *
  * The tinnitus profile deliberately does not live here. It stays on the
- * device (see src/tinnitus.tsx) and is not synced.
+ * device (see src/tinnitus.tsx) and is not synced — except the one yes/no,
+ * "do you have tinnitus?", which src/accountSync.tsx keeps in the account's
+ * user metadata so it follows the person to a new phone.
  */
 
 export type Profile = {

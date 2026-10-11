@@ -323,8 +323,12 @@ export default function Dashboard() {
                       ]}
                     >
                       {avgVol > LOUD_THRESHOLD
-                        ? 'Loud, night after night. Masking works better just under your tinnitus than over it, and long exposure at this level is worth avoiding.'
-                        : 'Sitting under the level where masking starts to work against you.'}
+                        ? tin.noTinnitus
+                          ? 'Loud, night after night. Long exposure at this level is worth avoiding.'
+                          : 'Loud, night after night. Masking works better just under your tinnitus than over it, and long exposure at this level is worth avoiding.'
+                        : tin.noTinnitus
+                          ? 'Sitting under the loud range.'
+                          : 'Sitting under the level where masking starts to work against you.'}
                     </Text>
                   </GlassCard>
                 </Section>
@@ -334,7 +338,9 @@ export default function Dashboard() {
 
           {/* The check-in lives on its own, whether or not there is listening
               history — it is the one measure that is about the tinnitus
-              rather than about the app. */}
+              rather than about the app. Which is also why someone without
+              tinnitus does not get it: there is nothing for it to measure. */}
+          {tin.noTinnitus ? null : (
           <Section label="How much it gets in the way">
             <GlassCard r={radius.lg} style={{ padding: 18, gap: space.md }}>
               {trend ? (
@@ -446,6 +452,7 @@ export default function Dashboard() {
               )}
             </GlassCard>
           </Section>
+          )}
 
           <View style={{ gap: 4, alignItems: 'center' }}>
             <Text style={[t.meta, { color: color.ink58, textAlign: 'center', lineHeight: 17 }]}>
