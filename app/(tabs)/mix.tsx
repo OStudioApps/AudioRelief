@@ -9,8 +9,11 @@ import { Icon } from '../../src/components/Icon';
 import { PressScale } from '../../src/components/Motion';
 import { useTabClearance } from '../../src/components/MiniPlayer';
 import { artFor, soundById } from '../../src/data/sounds';
+import { mixerSoundColors } from '../../src/data/mixerSounds';
+import { SoundIcon } from '../../src/components/SoundIcon';
 import { SavedMix, useMixes } from '../../src/mixes';
 import { usePlayer } from '../../src/state';
+import { useNowPlaying } from '../../src/audio/nowPlaying';
 import { color, font, glow, motion, radius, safe, space, type as t } from '../../src/theme';
 
 
@@ -43,8 +46,15 @@ function MixCard({ mix, onPlay, onEdit, playing }: {
     .map((l) => ({ key: l.id, art: artFor(l.id), sound: soundById(l.id) }))
     .filter((p) => p.art);
 
-  const lead = soundById(mix.layers[0]?.id ?? '');
-  const colors = (lead?.colors ?? [color.violet, color.night]) as readonly [string, string];
+  const first = mix.layers[0];
+  const lead = soundById(first?.id ?? '');
+  const colors = (lead?.colors ?? (first ? mixerSoundColors(first.id) : [color.violet, color.night])) as readonly [
+    string,
+    string,
+  ];
+  // Library sounds have no photographs; without panels, the card shows what
+  // it is made of as the sounds' own icons instead.
+  const icons = mix.layers.slice(0, 4).map((l) => ({ key: l.id, name: l.icon ?? soundById(l.id)?.icon }));
   const count = mix.layers.length;
 
   return (
@@ -110,6 +120,13 @@ function MixCard({ mix, onPlay, onEdit, playing }: {
           style={StyleSheet.absoluteFill}
         />
         <View style={{ position: 'absolute', left: 14, right: 14, bottom: 13, gap: 3 }}>
+          {panels.length ? null : (
+            <View style={{ flexDirection: 'row', gap: 6, marginBottom: 6 }}>
+              {icons.map((ic) => (
+                <SoundIcon key={ic.key} name={ic.name} size={16} color="rgba(255,255,255,0.8)" />
+              ))}
+            </View>
+          )}
           <Text style={[t.card, { color: color.ink, fontSize: 14.5, lineHeight: 18 }]} numberOfLines={2}>
             {mix.name}
           </Text>
@@ -178,6 +195,7 @@ export default function Mixes() {
   const TAB_CLEARANCE = useTabClearance();
   const p = usePlayer();
   const { mixes, loaded } = useMixes();
+  const np = useNowPlaying();
 
   return (
     <View style={{ flex: 1, backgroundColor: color.ground }}>
@@ -259,11 +277,15 @@ export default function Mixes() {
                 <MixCard
                   key={m.id}
                   mix={m}
-                  playing={p.selection.id === m.id && p.playing}
+                  playing={np.kind !== 'track' && p.selection.id === m.id && p.playing}
                   onPlay={() => {
-                    if (p.selection.id === m.id) p.togglePlay();
-                    else p.playMix(m);
-                    if (p.selection.id !== m.id) router.push('/player');
+                    const fresh = p.selection.id !== m.id;
+                    np.playLoop(
+                      { id: m.id, play: () => p.playMix(m) },
+                      mixes.map((x) => ({ id: x.id, play: () => p.playMix(x) })),
+                      'Your mixes',
+                    );
+                    if (fresh) router.push('/player');
                   }}
                   onEdit={() => router.push({ pathname: '/mix-edit', params: { id: m.id } })}
                 />

@@ -17,6 +17,7 @@ import { Aurora } from '../../src/components/Aurora';
 import { GlassCard } from '../../src/components/Glass';
 import { Icon } from '../../src/components/Icon';
 import { useTabClearance } from '../../src/components/MiniPlayer';
+import { useNowPlaying } from '../../src/audio/nowPlaying';
 import { useTrackPlayer } from '../../src/audio/tracks';
 import { formatLength, matchesQuery, trackColors, useLibrary } from '../../src/data/library';
 import { color, font, motion, radius, safe, type as t } from '../../src/theme';
@@ -106,6 +107,7 @@ export default function Sounds() {
   const insets = useSafeAreaInsets();
   const lib = useLibrary();
   const tp = useTrackPlayer();
+  const np = useNowPlaying();
   const clearance = useTabClearance();
   const [query, setQuery] = useState('');
 
@@ -115,7 +117,8 @@ export default function Sounds() {
   );
   const searching = query.trim().length > 0;
 
-  const currentId = tp.current?.id ?? null;
+  // Only while a track is what the player is on — not after a noise has taken over.
+  const currentId = np.kind === 'track' ? (tp.current?.id ?? null) : null;
   const isSounding = (id: string) => currentId === id && tp.playing;
 
   const empty = (message: string) => (
@@ -184,7 +187,7 @@ export default function Sounds() {
                 return (
                   <PressScale
                     key={s.id}
-                    onPress={() => url && tp.playFrom(results, s.id)}
+                    onPress={() => url && np.playTracks(results, s.id, query.trim() ? `Search: ${query.trim()}` : 'Sounds')}
                     accessibilityRole="button"
                     accessibilityLabel={`${isSounding(s.id) ? 'Pause' : 'Play'} ${s.title}`}
                     style={{

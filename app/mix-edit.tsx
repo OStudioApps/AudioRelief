@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useEffect, useState } from 'react';
 import {
   KeyboardAvoidingView,
   Platform,
@@ -18,6 +18,13 @@ import { Icon } from '../src/components/Icon';
 import { SoundIcon } from '../src/components/SoundIcon';
 import { PressScale } from '../src/components/Motion';
 import { soundById } from '../src/data/sounds';
+import { mixerSoundColors } from '../src/data/mixerSounds';
+import { useAdminMixes } from '../src/data/adminMixes';
+import { gainFor, SOUND_ASSETS } from '../src/audio/assets';
+import { LoopVoice } from '../src/audio/engine';
+import { useTrackPlayer } from '../src/audio/tracks';
+import { usePlayer } from '../src/state';
+import { setAudioModeAsync } from 'expo-audio';
 import { MixLayer, useMixes } from '../src/mixes';
 import { color, font, motion, radius, safe, space, type as t } from '../src/theme';
 
@@ -25,27 +32,106 @@ import { color, font, motion, radius, safe, space, type as t } from '../src/them
  * Building one mix: name it, add sounds from the library, set how loud each
  * one sits, save it.
  *
- * Everything here is local to the screen until Save. The old mixer edited the
- * live player as you went, which meant backing out left the sound changed
- * anyway and there was no such thing as cancelling.
+ * You hear it as you build it. Each sound starts the moment it is added and
+ * they all loop together, so the balance is set by ear: a slider or a mute
+ * changes what you hear straight away.
+ *
+ * That preview belongs to this screen alone. It is not the player — it does
+ * not show in the mini player or count as listening — and it stops when the
+ * screen closes, whether by Save or Cancel. The recipe itself stays local
+ * until Save, so cancelling still changes nothing.
  */
 
 const DEFAULT_LAYER_VOLUME = 60;
 
+/** What a layer plays: its streamed sound, or a noise bundled with the app (older mixes). */
+const sourceOf = (l: MixLayer) => (l.url ? { uri: l.url } : (SOUND_ASSETS[l.id] ?? null));
+
+/** How a layer is shown. Saved layers carry their own name; older ones fall back to the built-in list. */
+function describe(l: MixLayer) {
+  const legacy = soundById(l.id);
+  return {
+    name: l.name ?? legacy?.name ?? 'Sound',
+    icon: l.icon ?? legacy?.icon ?? 'Waves',
+    colors: (legacy?.colors as unknown as readonly [string, string] | undefined) ?? mixerSoundColors(l.id),
+  };
+}
+
+/** Every added sound, looping together, at the volumes on screen. Renders no UI. */
+function MixPreview({ layers, playing }: { layers: MixLayer[]; playing: boolean }) {
+  const p = usePlayer();
+  return (
+    <>
+      {layers.map((l) => {
+        const source = sourceOf(l);
+        if (!source) return null;
+        return (
+          <LoopVoice
+            key={l.id}
+            source={source}
+            // Same master volume and hearing ceiling as the player, so the
+            // mix sounds here the way it will sound once saved.
+            gain={l.on ? gainFor(p.volume, l.vol) : 0}
+            playing={playing}
+          />
+        );
+      })}
+    </>
+  );
+}
+
 export default function MixEdit() {
   const router = useRouter();
   const insets = useSafeAreaInsets();
-  const { id } = useLocalSearchParams<{ id?: string }>();
+  // `id`: edit one of the person's mixes. `from`: start a new one as a copy
+  // of a dashboard mix ("Make it yours") — saving never touches the original.
+  const { id, from } = useLocalSearchParams<{ id?: string; from?: string }>();
   const { byId, save, remove } = useMixes();
+  const { mixes: appMixes } = useAdminMixes();
 
   const existing = id ? byId(id) : undefined;
+  const source = from ? appMixes.find((m) => m.id === from) : undefined;
 
-  const [name, setName] = useState(existing?.name ?? '');
-  const [layers, setLayers] = useState<MixLayer[]>(existing?.layers ?? []);
+  const [name, setName] = useState(existing?.name ?? source?.name ?? '');
+  const [layers, setLayers] = useState<MixLayer[]>(existing?.layers ?? source?.layers ?? []);
+
+  // Opened before the dashboard mixes had loaded (a reload, a link): fill in
+  // the copy once they arrive, unless the person has already started.
+  useEffect(() => {
+    if (!source || existing) return;
+    setName((n) => n || source.name);
+    setLayers((ls) => (ls.length ? ls : source.layers));
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [source?.id]);
   const [picking, setPicking] = useState(false);
   const [confirmDelete, setConfirmDelete] = useState(false);
 
   const canSave = name.trim().length > 0 && layers.length > 0;
+
+  // Back to wherever the editor was opened from — or the Mix tab when it was
+  // reached directly (a reload on web, a link), where there is nothing to go back to.
+  const leave = () => (router.canGoBack() ? router.back() : router.replace('/(tabs)/mix'));
+
+  /*
+    The preview: on by default, so adding a sound is hearing it. The pause
+    button silences everything at once without losing the sounds.
+  */
+  const [listening, setListening] = useState(true);
+  const audible = listening && layers.some((l) => sourceOf(l) != null);
+  const p = usePlayer();
+  const tp = useTrackPlayer();
+
+  // Starting the preview takes the speaker: whatever was playing pauses, so
+  // only the mix being built is heard.
+  useEffect(() => {
+    if (!audible) return;
+    if (p.playing) p.togglePlay();
+    if (tp.playing) tp.toggle();
+    setAudioModeAsync({ playsInSilentMode: true, shouldPlayInBackground: false, interruptionMode: 'doNotMix' }).catch(
+      () => {},
+    );
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [audible]);
 
   const setVol = (sid: string, vol: number) =>
     setLayers((ls) => ls.map((l) => (l.id === sid ? { ...l, vol } : l)));
@@ -54,7 +140,8 @@ export default function MixEdit() {
   const drop = (sid: string) => setLayers((ls) => ls.filter((l) => l.id !== sid));
 
   return (
-    <View style={{ flex: 1, backgroundColor: color.ground }}>
+    // Clipped: the aurora drifts past the edges, which made the page scroll sideways on web.
+    <View style={{ flex: 1, backgroundColor: color.ground, overflow: 'hidden' }}>
       <Aurora
         blobs={[
           { size: 300, color: color.accent, opacity: 0.24, left: -90, top: -60, duration: motion.driftSlow },
@@ -70,11 +157,23 @@ export default function MixEdit() {
         }}
       >
         <View style={{ flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', minHeight: 44 }}>
-          <RoundButton label="Cancel" onPress={() => router.back()}>
+          <RoundButton label="Cancel" onPress={() => leave()}>
             <Icon name="close" size={18} strokeWidth={1.8} />
           </RoundButton>
-          <Text style={[t.label, { color: color.ink58 }]}>{existing ? 'Edit mix' : 'New mix'}</Text>
-          <View style={{ width: 44 }} />
+          <Text style={[t.label, { color: color.ink58 }]}>
+            {existing ? 'Edit mix' : source ? 'Make it yours' : 'New mix'}
+          </Text>
+          {layers.length ? (
+            <RoundButton
+              label={listening ? 'Pause preview' : 'Play preview'}
+              onPress={() => setListening((v) => !v)}
+              style={listening ? { borderColor: color.accent } : undefined}
+            >
+              <Icon name={listening ? 'pause' : 'play'} size={16} color={listening ? color.accent : color.ink} />
+            </RoundButton>
+          ) : (
+            <View style={{ width: 44 }} />
+          )}
         </View>
 
         <KeyboardAvoidingView
@@ -124,13 +223,13 @@ export default function MixEdit() {
               </View>
 
               {layers.map((l) => {
-                const s = soundById(l.id);
-                if (!s) return null;
+                const s = describe(l);
+                const silent = sourceOf(l) == null;
                 return (
                   <GlassCard key={l.id} style={{ padding: 14, opacity: l.on ? 1 : 0.52 }}>
                     <View style={{ flexDirection: 'row', alignItems: 'center', gap: 12, minHeight: 44 }}>
                       <LinearGradient
-                        colors={s.colors as unknown as readonly [string, string]}
+                        colors={s.colors}
                         start={{ x: 0.1, y: 0 }}
                         end={{ x: 1, y: 1 }}
                         style={{ width: 34, height: 34, borderRadius: radius.xs, alignItems: 'center', justifyContent: 'center' }}
@@ -139,7 +238,9 @@ export default function MixEdit() {
                       </LinearGradient>
                       <View style={{ flex: 1, gap: 2 }}>
                         <Text style={[t.card, { color: color.ink }]} numberOfLines={1}>{s.name}</Text>
-                        <Text style={[t.meta, { color: color.ink58 }]} numberOfLines={1}>{s.meta}</Text>
+                        <Text style={[t.meta, { color: silent ? color.scaleMid : color.ink58 }]} numberOfLines={1}>
+                          {silent ? 'No audio — remove and pick another' : !l.on ? 'Muted' : audible ? 'Playing' : 'Paused'}
+                        </Text>
                       </View>
                       <PressScale
                         onPress={() => toggle(l.id)}
@@ -220,7 +321,7 @@ export default function MixEdit() {
                 disabled={!canSave}
                 onPress={() => {
                   save({ id: existing?.id, name, layers });
-                  router.back();
+                  leave();
                 }}
               />
               {/* Says which of the two things is missing, rather than leaving
@@ -240,7 +341,7 @@ export default function MixEdit() {
                     return;
                   }
                   remove(existing.id);
-                  router.back();
+                  leave();
                 }}
                 accessibilityRole="button"
                 accessibilityLabel={confirmDelete ? 'Tap again to delete this mix' : 'Delete this mix'}
@@ -255,14 +356,23 @@ export default function MixEdit() {
         </KeyboardAvoidingView>
       </View>
 
+      <MixPreview layers={layers} playing={audible} />
+
       <AddSoundSheet
         visible={picking}
         inMix={layers.map((l) => l.id)}
-        onAdd={(sid) =>
+        onAdd={(sound) => {
+          // Adding is a request to hear it, even if the preview was paused.
+          setListening(true);
           setLayers((ls) =>
-            ls.some((l) => l.id === sid) ? ls : [...ls, { id: sid, vol: DEFAULT_LAYER_VOLUME, on: true }],
-          )
-        }
+            ls.some((l) => l.id === sound.id)
+              ? ls
+              : [
+                  ...ls,
+                  { id: sound.id, vol: DEFAULT_LAYER_VOLUME, on: true, name: sound.title, url: sound.url, icon: sound.icon },
+                ],
+          );
+        }}
         onClose={() => setPicking(false)}
       />
     </View>

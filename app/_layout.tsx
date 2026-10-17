@@ -18,6 +18,7 @@ import { AuthProvider } from '../src/auth';
 import { PlayerProvider } from '../src/state';
 import { SoundEngine } from '../src/audio/engine';
 import { TrackPlayerProvider } from '../src/audio/tracks';
+import { NowPlayingProvider } from '../src/audio/nowPlaying';
 import { TinnitusProvider } from '../src/tinnitus';
 import { TinnitusAccountSync } from '../src/accountSync';
 import { SampleProvider } from '../src/components/SamplePlayer';
@@ -46,12 +47,14 @@ export default function RootLayout() {
               from here rather than from state.tsx — that import was what made
               state and the engine a require cycle. */}
           <SoundEngine />
-          {/* Same reason, and it needs the history store above it: this is
-              what turns listening into the numbers on the dashboard. */}
-          <SessionRecorder />
           {/* The Sounds library's player. Inside PlayerProvider so it and the
               mix can hand the speaker to each other. */}
           <TrackPlayerProvider>
+          {/* Same reason, and it needs the history store above it and both
+              engines around it: this is what turns listening — tracks and
+              loops — into the numbers on the dashboard. */}
+          <SessionRecorder />
+          <NowPlayingProvider>
           <TinnitusProvider>
               {/* Needs both the session above and the profile around it: it
                   carries the "do you have tinnitus?" answer between them. */}
@@ -73,7 +76,7 @@ export default function RootLayout() {
                     <Stack.Screen name="(onboarding)" options={{ animation: 'none' }} />
                     <Stack.Screen name="(tabs)" />
                     <Stack.Screen name="player" options={{ animation: 'slide_from_bottom' }} />
-                    <Stack.Screen name="track" options={{ animation: 'slide_from_bottom' }} />
+                    <Stack.Screen name="playlist/[id]" options={{ animation: 'slide_from_right' }} />
                     <Stack.Screen name="dashboard" options={{ animation: 'slide_from_bottom' }} />
                     {/* Building a mix is a task you come back out of, so it rises over
                         the library rather than replacing it sideways. */}
@@ -82,6 +85,7 @@ export default function RootLayout() {
                 </SampleProvider>
               </MixesProvider>
           </TinnitusProvider>
+          </NowPlayingProvider>
           </TrackPlayerProvider>
         </PlayerProvider>
         </HistoryProvider>

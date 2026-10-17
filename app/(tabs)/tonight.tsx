@@ -1,5 +1,5 @@
-import React, { useEffect, useRef, useState } from 'react';
-import { Animated, Easing, Image, ScrollView, StyleSheet, Text, View } from 'react-native';
+import React, { useEffect, useMemo, useRef, useState } from 'react';
+import { Animated, Easing, Image, ImageSourcePropType, ScrollView, StyleSheet, Text, View } from 'react-native';
 import { useRouter } from 'expo-router';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { LinearGradient } from 'expo-linear-gradient';
@@ -9,8 +9,17 @@ import { Icon } from '../../src/components/Icon';
 import { FadeIn, PressScale, useReducedMotion } from '../../src/components/Motion';
 import { useTabClearance } from '../../src/components/MiniPlayer';
 import { usePlayer } from '../../src/state';
+import { type LoopEntry, useNowPlaying } from '../../src/audio/nowPlaying';
+import { useTrackPlayer } from '../../src/audio/tracks';
+import { formatClock, formatLength, trackColors, useLibrary } from '../../src/data/library';
+import { playlistMeta, usePlaylists } from '../../src/data/playlists';
+import { recommendTracks } from '../../src/data/recommendTracks';
+import { PlaylistCover } from '../../src/components/PlaylistCover';
 import { useTinnitus } from '../../src/tinnitus';
-import { artFor, MIXES, MIX_ART, NOISES, soundById } from '../../src/data/sounds';
+import { NOISES, soundById } from '../../src/data/sounds';
+import { type AdminMix, soundCount, useAdminMixes } from '../../src/data/adminMixes';
+import { mixerSoundColors } from '../../src/data/mixerSounds';
+import { SoundIcon } from '../../src/components/SoundIcon';
 import {
   alternativeTo,
   CHECKIN_DAYS,
@@ -225,8 +234,8 @@ function DayDots({ elapsed }: { elapsed: number }) {
  *
  * Anything without artwork falls back to the card's plain glass.
  */
-function NowPlayingBackdrop({ source }: { source: number | null }) {
-  const [layers, setLayers] = useState<{ current: number | null; leaving: number | null }>({
+function NowPlayingBackdrop({ source }: { source: ImageSourcePropType | null }) {
+  const [layers, setLayers] = useState<{ current: ImageSourcePropType | null; leaving: ImageSourcePropType | null }>({
     current: source,
     leaving: null,
   });
@@ -297,6 +306,16 @@ function NowPlayingBackdrop({ source }: { source: number | null }) {
   );
 }
 
+/** A row's heading, with the one line under it that says why the row is here. */
+function RowHead({ title, sub }: { title: string; sub?: string }) {
+  return (
+    <View style={{ gap: 3, marginBottom: 12 }}>
+      <SectionLabel>{title}</SectionLabel>
+      {sub ? <Text style={[t.meta, { color: color.ink58, fontSize: 12 }]}>{sub}</Text> : null}
+    </View>
+  );
+}
+
 /** One recommended sound, with the reason it is being suggested. */
 function SoundSuggestion({
   id,
@@ -346,7 +365,17 @@ export default function Home() {
   const insets = useSafeAreaInsets();
   const TAB_CLEARANCE = useTabClearance();
   const p = usePlayer();
+  const np = useNowPlaying();
+  const tp = useTrackPlayer();
   const tin = useTinnitus();
+  const { playlists } = usePlaylists();
+  const lib = useLibrary();
+  // Someone who has not answered the tinnitus question yet gets the tinnitus
+  // row: the app is for tinnitus first, and sleep is the fallback.
+  const rec = useMemo(
+    () => recommendTracks(lib.tracks, { tinnitus: !tin.noTinnitus, hz: tin.hz, character: tin.character }),
+    [lib.tracks, tin.noTinnitus, tin.hz, tin.character],
+  );
 
   const pick = pickByPitch(tin.hz, tin.character);
   const alt = alternativeTo(pick, tin.hz);
@@ -357,18 +386,69 @@ export default function Home() {
   // Every sound has artwork now — mixes, library sounds and the noises —
   // so whatever is selected, from home or from the Sounds tab, shows here.
   // artId, not the selection: a saved mix shows its first sound's photograph.
-  const nowPlayingArt = artFor(p.artId);
+  const nowPlayingArt = np.art;
+
+  // Each row is the queue for next/previous on the player: skipping from
+  // pink noise goes to brown, not to whatever the last track was.
+  const noiseQueue: LoopEntry[] = NOISES.map((n) => ({ id: n.id, play: () => p.select({ kind: 'noise', id: n.id }) }));
+  const { mixes: adminMixes } = useAdminMixes();
+  const mixQueue: LoopEntry[] = adminMixes.map((m) => ({ id: m.id, play: () => p.playMix({ ...m, by: 'app' }) }));
+  const playAdminMix = (m: AdminMix) =>
+    np.playLoop(mixQueue.find((e) => e.id === m.id) ?? { id: m.id, play: () => p.playMix({ ...m, by: 'app' }) }, mixQueue, 'Mixes');
+  const playNoise = (id: string) => {
+    const entry = noiseQueue.find((e) => e.id === id) ?? { id, play: () => p.select({ kind: 'noise', id }) };
+    np.playLoop(entry, noiseQueue, 'Steady noise');
+  };
+  // A loop is what the player is on — highlights stay off while a track
+  // plays, and before anything has been played at all.
+  const onLoop = np.source === 'loop';
+
+  /*
+    The card at the top. Once anything has played it is whatever played last;
+    before that — a first launch — it offers the first mix from the
+    dashboard rather than a built-in sound with no audio behind it.
+  */
+  const idleMix = np.source == null ? adminMixes[0] : undefined;
+  const hero = idleMix
+    ? {
+        title: idleMix.name,
+        subtitle: `${soundCount(idleMix.layers.length)} · AudioRelief mix`,
+        playing: false,
+        tint: mixerSoundColors(idleMix.layers[0].id)[0],
+        art: null,
+        toggle: () => playAdminMix(idleMix),
+        open: () => {
+          playAdminMix(idleMix);
+          router.push('/player');
+        },
+      }
+    : {
+        title: np.title,
+        subtitle: np.subtitle,
+        playing: np.playing,
+        tint: np.colors[0],
+        art: nowPlayingArt,
+        toggle: np.toggle,
+        open: () => router.push('/player'),
+      };
 
   const startNoise = (id: string) => {
-    p.select({ kind: 'noise', id });
+    playNoise(id);
     router.push('/player');
   };
+
+  const sleepNote =
+    p.sleep == null
+      ? 'Sleep timer off'
+      : p.sleep === 'track'
+        ? 'Stops at end of track'
+        : `Stops in ${formatClock(p.sleepRemaining ?? 0)}`;
 
   return (
     <View style={{ flex: 1, backgroundColor: color.ground }}>
       <Aurora
         blobs={[
-          { size: 300, color: p.colors[0], opacity: 0.34, left: -70, top: -60, duration: motion.driftFast },
+          { size: 300, color: np.colors[0], opacity: 0.34, left: -70, top: -60, duration: motion.driftFast },
           { size: 260, color: color.accent, opacity: 0.22, right: -90, top: 120, dx: -30, dy: 26, duration: motion.driftSlow },
           { size: 320, color: color.violet, opacity: 0.26, left: 40, bottom: -140 },
         ]}
@@ -469,30 +549,30 @@ export default function Home() {
         {!tin.loaded || (!tin.hasProfile && !tin.noTinnitus) ? <View style={{ height: 20 }} /> : null}
 
         <FadeIn delay={140}>
-          <PressScale onPress={() => router.push('/player')}>
+          <PressScale onPress={hero.open}>
             <GlassCard r={radius.xl} style={{ minHeight: 168, padding: 20, justifyContent: 'space-between' }}>
-              <NowPlayingBackdrop source={nowPlayingArt} />
+              <NowPlayingBackdrop source={hero.art} />
               {/*
                 The halo is for sounds with no photograph. Over artwork its
                 hard 220px edge cut a visible disc out of the picture, which
                 read as the image being badly cropped inside the card — the
                 photo is fine, the circle was sitting on top of it.
               */}
-              {nowPlayingArt ? null : <BreathingHalo tint={p.colors[0]} active={p.playing} />}
+              {hero.art ? null : <BreathingHalo tint={hero.tint} active={hero.playing} />}
               <Text style={[t.label, { color: color.ink58 }]}>
-                {p.playing ? 'Playing now' : 'Pick up where you left off'}
+                {hero.playing ? 'Playing now' : idleMix ? 'Start here tonight' : 'Pick up where you left off'}
               </Text>
               <View style={{ gap: 6, marginTop: 10 }}>
                 <Text style={{ fontFamily: font.display, fontSize: 22, color: color.ink, letterSpacing: -0.5, lineHeight: 26 }}>
-                  {p.title}
+                  {hero.title}
                 </Text>
-                <Text style={[t.bodyMuted, { color: color.ink62 }]}>{p.subtitle}</Text>
+                <Text style={[t.bodyMuted, { color: color.ink62 }]}>{hero.subtitle}</Text>
               </View>
               <View style={{ flexDirection: 'row', alignItems: 'center', gap: 14, marginTop: 14 }}>
                 <PressScale
                   onPress={(e) => {
                     e.stopPropagation();
-                    p.togglePlay();
+                    hero.toggle();
                   }}
                   style={{
                     width: 52,
@@ -504,9 +584,9 @@ export default function Home() {
                     boxShadow: glow(color.accent, 0.34, 22, 6),
                   }}
                 >
-                  <Icon name={p.playing ? 'pause' : 'play'} color={color.onAccent} />
+                  <Icon name={hero.playing ? 'pause' : 'play'} color={color.onAccent} />
                 </PressScale>
-                <Text style={[t.meta, { color: color.ink58, fontSize: 12 }]}>{p.fade}</Text>
+                <Text style={[t.meta, { color: color.ink58, fontSize: 12, fontVariant: ['tabular-nums'] }]}>{sleepNote}</Text>
               </View>
             </GlassCard>
           </PressScale>
@@ -514,25 +594,133 @@ export default function Home() {
 
         <View style={{ height: 20 }} />
 
-        <View style={{ flexDirection: 'row', alignItems: 'baseline', justifyContent: 'space-between' }}>
-          <SectionLabel>Everything else</SectionLabel>
-          <Text style={{ fontFamily: t.body.fontFamily, fontSize: 13, color: color.ink58 }}>Mixes</Text>
-        </View>
+        {playlists.length ? (
+          <>
+            <RowHead title="Playlists" />
+            <ScrollView
+              horizontal
+              showsHorizontalScrollIndicator={false}
+              style={{ marginHorizontal: -safe.side }}
+              contentContainerStyle={{ paddingHorizontal: safe.side, gap: 12 }}
+            >
+              {playlists.map((pl) => (
+                <PressScale
+                  key={pl.id}
+                  onPress={() => router.push({ pathname: '/playlist/[id]', params: { id: pl.id } })}
+                  accessibilityRole="button"
+                  accessibilityLabel={`${pl.title} playlist, ${playlistMeta(pl)}`}
+                  style={{ width: 150, gap: 8 }}
+                >
+                  <PlaylistCover playlist={pl} size={150} radius={radius.lg} />
+                  <View style={{ gap: 2 }}>
+                    <Text style={[t.card, { color: color.ink, fontSize: 14 }]} numberOfLines={1}>
+                      {pl.title}
+                    </Text>
+                    <Text style={[t.meta, { color: color.ink58 }]} numberOfLines={1}>
+                      {playlistMeta(pl)}
+                    </Text>
+                  </View>
+                </PressScale>
+              ))}
+            </ScrollView>
+            <View style={{ height: 22 }} />
+          </>
+        ) : null}
 
-        <View style={{ height: 10 }} />
+        {rec.tracks.length ? (
+          <>
+            <RowHead title={rec.title} sub={rec.reason} />
+            <ScrollView
+              horizontal
+              showsHorizontalScrollIndicator={false}
+              style={{ marginHorizontal: -safe.side }}
+              contentContainerStyle={{ paddingHorizontal: safe.side, gap: 12 }}
+            >
+              {rec.tracks.map((tr) => {
+                const on = np.kind === 'track' && tp.current?.id === tr.id;
+                return (
+                  <PressScale
+                    key={tr.id}
+                    onPress={() => np.playTracks(rec.tracks, tr.id, rec.title)}
+                    accessibilityRole="button"
+                    accessibilityLabel={`${on && np.playing ? 'Pause' : 'Play'} ${tr.title}`}
+                    style={{ width: 132, gap: 8 }}
+                  >
+                    <View
+                      style={{
+                        width: 132,
+                        height: 132,
+                        borderRadius: radius.md,
+                        overflow: 'hidden',
+                        borderWidth: 1.5,
+                        borderColor: on ? color.accent : 'transparent',
+                      }}
+                    >
+                      <LinearGradient
+                        colors={trackColors(tr.id)}
+                        start={{ x: 0.1, y: 0 }}
+                        end={{ x: 0.9, y: 1 }}
+                        style={StyleSheet.absoluteFill}
+                      />
+                      {tr.cover_art_url ? (
+                        <Image source={{ uri: tr.cover_art_url }} style={StyleSheet.absoluteFill} resizeMode="cover" />
+                      ) : null}
+                      <View
+                        style={{
+                          position: 'absolute',
+                          right: 8,
+                          bottom: 8,
+                          width: 32,
+                          height: 32,
+                          borderRadius: 16,
+                          alignItems: 'center',
+                          justifyContent: 'center',
+                          backgroundColor: on ? color.accent : 'rgba(7,10,22,0.5)',
+                        }}
+                      >
+                        <Icon name={on && np.playing ? 'pause' : 'play'} size={12} color={on ? color.onAccent : color.ink} />
+                      </View>
+                    </View>
+                    <View style={{ gap: 2 }}>
+                      <Text style={[t.card, { color: color.ink, fontSize: 13.5 }]} numberOfLines={1}>
+                        {tr.title}
+                      </Text>
+                      <Text style={[t.meta, { color: color.ink58 }]} numberOfLines={1}>
+                        {[tr.artist, formatLength(tr.duration_seconds)].filter(Boolean).join(' · ') || 'AudioRelief'}
+                      </Text>
+                    </View>
+                  </PressScale>
+                );
+              })}
+            </ScrollView>
+            <View style={{ height: 22 }} />
+          </>
+        ) : null}
 
-        <View style={{ flexDirection: 'row', flexWrap: 'wrap', gap: 12 }}>
-          {MIXES.map((m) => {
-            const on = p.selection.kind === 'mix' && p.selection.id === m.id;
-            const art = MIX_ART[m.id];
+        <RowHead title="Mixes" sub="Layered sounds that loop all night" />
+        {/*
+          Mixes made on the dashboard, for everyone, then a way to make one's
+          own. The last card is always there, so the row is never empty —
+          before any mix is published, or offline, it is the whole row.
+        */}
+        <ScrollView
+          horizontal
+          showsHorizontalScrollIndicator={false}
+          style={{ marginHorizontal: -safe.side }}
+          contentContainerStyle={{ paddingHorizontal: safe.side, gap: 12 }}
+        >
+          {adminMixes.map((m) => {
+            const on = onLoop && p.selection.id === m.id;
+            const tint = mixerSoundColors(m.layers[0].id);
             return (
               <PressScale
                 key={m.id}
-                onPress={() => p.select({ kind: 'mix', id: m.id })}
+                onPress={() => playAdminMix(m)}
+                accessibilityRole="button"
+                accessibilityLabel={`${on && np.playing ? 'Pause' : 'Play'} ${m.name}, ${soundCount(m.layers.length)}`}
                 style={{
-                  width: '47.5%',
-                  flexGrow: 1,
-                  minHeight: 112,
+                  width: 156,
+                  minHeight: 108,
                   borderRadius: radius.lg,
                   overflow: 'hidden',
                   backgroundColor: on ? 'rgba(255,255,255,0.09)' : 'rgba(255,255,255,0.045)',
@@ -540,41 +728,68 @@ export default function Home() {
                   borderColor: on ? color.accent : color.glassBorder,
                 }}
               >
-                {/*
-                  The photograph is atmosphere, not content — held well back so
-                  the card still reads as part of the dark glass system rather
-                  than becoming a bright tile. The scrim on top guarantees the
-                  text stays legible whatever the picture is doing underneath.
-                */}
-                {art ? (
-                  <>
-                    <Image
-                      source={art.image}
-                      style={[StyleSheet.absoluteFill, { width: '100%', height: '100%', opacity: 0.3 }]}
-                      resizeMode="cover"
-                    />
-                    <LinearGradient
-                      colors={['rgba(7,10,22,0.30)', 'rgba(7,10,22,0.86)']}
-                      start={{ x: 0.2, y: 0 }}
-                      end={{ x: 0.6, y: 1 }}
-                      style={StyleSheet.absoluteFill}
-                    />
-                  </>
-                ) : null}
-
-                <View style={{ flex: 1, padding: 14, justifyContent: 'space-between' }}>
-                  <Icon name={art?.icon ?? 'waves'} size={22} color={on ? color.accent : color.ink82} />
+                {/* The first sound's colour, held back so the card stays dark glass. */}
+                <LinearGradient
+                  colors={[rgba(tint[0], 0.28), rgba(tint[1], 0.08)]}
+                  start={{ x: 0, y: 0 }}
+                  end={{ x: 1, y: 1 }}
+                  style={StyleSheet.absoluteFill}
+                />
+                <View style={{ flex: 1, padding: 13, justifyContent: 'space-between' }}>
+                  <View style={{ flexDirection: 'row', gap: 6 }}>
+                    {m.layers.slice(0, 4).map((l) => (
+                      <SoundIcon key={l.id} name={l.icon} size={18} color={on ? color.accent : color.ink82} />
+                    ))}
+                  </View>
                   <View style={{ gap: 3, marginTop: 12 }}>
-                    <Text style={[t.card, { color: color.ink, fontSize: 14, lineHeight: 18 }]}>{m.name}</Text>
-                    <Text style={[t.meta, { color: color.ink62 }]}>{m.sub}</Text>
+                    <Text style={[t.card, { color: color.ink, fontSize: 13.5, lineHeight: 17 }]} numberOfLines={2}>
+                      {m.name}
+                    </Text>
+                    <Text style={[t.meta, { color: color.ink62 }]} numberOfLines={1}>
+                      {soundCount(m.layers.length)}
+                    </Text>
                   </View>
                 </View>
               </PressScale>
             );
           })}
-        </View>
 
-        <View style={{ height: 18 }} />
+          <PressScale
+            onPress={() => router.push('/mix-edit')}
+            accessibilityRole="button"
+            accessibilityLabel="Create your own mix"
+            style={{
+              width: 156,
+              minHeight: 108,
+              borderRadius: radius.lg,
+              borderWidth: 1.5,
+              borderStyle: 'dashed',
+              borderColor: 'rgba(255,255,255,0.18)',
+              alignItems: 'center',
+              justifyContent: 'center',
+              gap: 8,
+              padding: 13,
+            }}
+          >
+            <View
+              style={{
+                width: 36,
+                height: 36,
+                borderRadius: 18,
+                alignItems: 'center',
+                justifyContent: 'center',
+                backgroundColor: 'rgba(255,255,255,0.08)',
+              }}
+            >
+              <Icon name="plus" size={18} color={color.accent} strokeWidth={2} />
+            </View>
+            <Text style={[t.card, { color: color.ink82, fontSize: 13.5, textAlign: 'center' }]}>
+              Create your own
+            </Text>
+          </PressScale>
+        </ScrollView>
+
+        <View style={{ height: 22 }} />
 
         <SectionLabel>Steady noise</SectionLabel>
 
@@ -582,7 +797,7 @@ export default function Home() {
 
         <View style={{ flexDirection: 'row', gap: 10 }}>
           {NOISES.map((n) => {
-            const on = p.selection.kind === 'noise' && p.selection.id === n.id;
+            const on = onLoop && p.selection.kind === 'noise' && p.selection.id === n.id;
             const suggested = tin.hasProfile && n.id === pick.id;
             return (
               <NoiseTile
@@ -592,7 +807,7 @@ export default function Home() {
                 selected={on}
                 playing={on && p.playing}
                 suggested={suggested}
-                onPress={() => p.select({ kind: 'noise', id: n.id })}
+                onPress={() => playNoise(n.id)}
               />
             );
           })}
