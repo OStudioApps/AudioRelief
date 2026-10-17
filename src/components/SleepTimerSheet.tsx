@@ -2,27 +2,34 @@ import React from 'react';
 import { Modal, Pressable, StyleSheet, Text, View } from 'react-native';
 import { BlurView } from 'expo-blur';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
-import { SLEEP_OPTIONS } from '../audio/tracks';
 import { formatClock } from '../data/library';
+import { SLEEP_OPTIONS } from '../data/sounds';
 import { color, font, radius, safe, type as t } from '../theme';
 import { RoundButton } from './Glass';
 import { Icon } from './Icon';
 import { PressScale } from './Motion';
 
+function fadeLabel(seconds: number) {
+  return seconds >= 120 ? `fades over the last ${Math.round(seconds / 60)} min` : `fades over the last ${seconds} s`;
+}
+
 /**
- * Pick when the library player stops itself. Choosing a length always
- * restarts it, including the one already running.
+ * Pick when the player stops itself — the one timer for tracks, noises and
+ * mixes. Choosing a length always restarts it, including the one running.
  */
 export function SleepTimerSheet({
   visible,
   selected,
   remaining,
+  allowEndOfTrack,
   onPick,
   onClose,
 }: {
   visible: boolean;
   selected: string | null;
   remaining: number | null;
+  /** "End of track" only makes sense for a library track; a loop never ends. */
+  allowEndOfTrack: boolean;
   onPick: (id: string | null) => void;
   onClose: () => void;
 }) {
@@ -37,7 +44,7 @@ export function SleepTimerSheet({
       ? 'Off · the sound plays until you stop it'
       : selected === 'track'
         ? 'Stops when this track ends'
-        : `Stops in ${formatClock(remaining ?? 0)} · fades over the last 30 s`;
+        : `Stops in ${formatClock(remaining ?? 0)} · ${fadeLabel(SLEEP_OPTIONS.find((o) => o.id === selected)?.fadeSeconds ?? 0)}`;
 
   return (
     <Modal visible={visible} transparent animationType="slide" onRequestClose={onClose}>
@@ -88,7 +95,7 @@ export function SleepTimerSheet({
             <View style={{ height: 12 }} />
 
             <View style={{ paddingHorizontal: safe.side - 6 }}>
-              {SLEEP_OPTIONS.map((o) => {
+              {SLEEP_OPTIONS.filter((o) => allowEndOfTrack || o.id !== 'track').map((o) => {
                 const on = selected === o.id;
                 return (
                   <PressScale

@@ -17,7 +17,14 @@ export type LibraryTrack = {
   file_url: string | null;
   cover_art_url: string | null;
   duration_seconds: number;
+  /** Set per track on the dashboard; null until someone tags it. */
+  target_frequency_band: FrequencyBand | null;
 };
+
+export type FrequencyBand = 'low_frequency' | 'mid_frequency' | 'high_frequency' | 'broadband';
+
+/** The columns every track query selects, so a track looks the same wherever it was loaded. */
+export const TRACK_COLUMNS = 'id, title, artist, file_url, cover_art_url, duration_seconds, target_frequency_band';
 
 export function formatLength(seconds: number): string | null {
   if (!seconds) return null;
@@ -37,7 +44,7 @@ export function useLibrary() {
     setLoading(true);
     const t = await supabase
       .from('music_tracks')
-      .select('id, title, artist, file_url, cover_art_url, duration_seconds')
+      .select(TRACK_COLUMNS)
       .eq('is_active', true)
       .order('created_at', { ascending: false });
     setError(t.error ? errorMessage(t.error) : null);

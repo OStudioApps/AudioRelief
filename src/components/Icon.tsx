@@ -14,6 +14,7 @@ import {
   CloudRain,
   Check,
   Clock,
+  DotsThree,
   Envelope,
   Eye,
   EyeSlash,
@@ -121,6 +122,7 @@ const ICONS: Record<string, PhosphorIcon> = {
   shuffle: Shuffle,
   repeat: Repeat,
   repeatOne: RepeatOnce,
+  more: DotsThree,
   sleepTimer: MoonStars,
   timer: Timer,
 };

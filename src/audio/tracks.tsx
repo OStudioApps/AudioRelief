@@ -6,8 +6,9 @@ import { OUTPUT_CEILING } from './assets';
 
 /**
  * The library player: the streamed tracks from the Sounds tab, played as a
- * queue the way a music app does — next, previous, scrub, shuffle, repeat,
- * and a sleep timer.
+ * queue the way a music app does — next, previous, scrub, shuffle and repeat.
+ * The sleep timer is the shared one in src/state.tsx, so it is the same timer
+ * whether a track, a noise or a mix is playing.
  *
  * It lives at the root rather than in the Sounds screen so the sound keeps
  * going when you change tab, and so the mini player and the full-screen
@@ -19,46 +20,28 @@ import { OUTPUT_CEILING } from './assets';
 
 export type Repeat = 'off' | 'all' | 'one';
 
-export type SleepOption = { id: string; label: string; minutes?: number };
-
-export const SLEEP_OPTIONS: SleepOption[] = [
-  { id: '5', label: '5 minutes', minutes: 5 },
-  { id: '10', label: '10 minutes', minutes: 10 },
-  { id: '15', label: '15 minutes', minutes: 15 },
-  { id: '30', label: '30 minutes', minutes: 30 },
-  { id: '45', label: '45 minutes', minutes: 45 },
-  { id: '60', label: '1 hour', minutes: 60 },
-  { id: 'track', label: 'End of track' },
-];
-
-/** The last stretch of a timed sleep eases down instead of cutting out. */
-const SLEEP_FADE_SECONDS = 30;
-
 /** Past this far into a track, "previous" restarts it rather than going back. */
 const RESTART_THRESHOLD = 3;
-
-type Sleep = { id: string; endsAt: number | null };
 
 type Ctx = {
   current: LibraryTrack | null;
   queue: LibraryTrack[];
   playing: boolean;
   buffering: boolean;
+  /** Where the queue came from — "Sounds", a playlist's name — for the player's header. */
+  context: string;
   /** Start `tracks` as the queue, from the one with `id`. Tapping the current track toggles it. */
-  playFrom: (tracks: LibraryTrack[], id: string) => void;
+  playFrom: (tracks: LibraryTrack[], id: string, context?: string) => void;
   toggle: () => void;
   next: () => void;
   prev: () => void;
   seek: (seconds: number) => void;
   shuffle: boolean;
   toggleShuffle: () => void;
+  setShuffle: (on: boolean) => void;
   repeat: Repeat;
   cycleRepeat: () => void;
-  /** The chosen sleep option's id, or null when no timer is set. */
-  sleep: string | null;
-  /** Seconds until a timed sleep stops the sound; null for none or end-of-track. */
-  sleepRemaining: number | null;
-  setSleep: (id: string | null) => void;
+  setRepeat: (r: Repeat) => void;
 };
 
 type Progress = { position: number; duration: number };
@@ -76,40 +59,27 @@ export function TrackPlayerProvider({ children }: { children: React.ReactNode })
   const status = useAudioPlayerStatus(player);
 
   const [queue, setQueue] = useState<LibraryTrack[]>([]);
+  const [context, setContext] = useState('Sounds');
   const [index, setIndex] = useState(-1);
   const [shuffle, setShuffle] = useState(false);
   // Sleep sounds are mostly one long texture, so the default is to hold the
   // one chosen rather than wander off into the next.
   const [repeat, setRepeat] = useState<Repeat>('one');
-  const [sleep, setSleepState] = useState<Sleep | null>(null);
-  const [now, setNow] = useState(() => Date.now());
 
   const current = index >= 0 ? queue[index] ?? null : null;
+  const endOfTrack = p.sleep === 'track';
+  const fadeGain = p.fadeGain;
 
-  /*
-    Remaining time runs off a deadline, not a counted tick: timers are
-    throttled with the screen off, which is exactly when this one runs.
-  */
+  // A timed sleep running out stops the track as well as the loops.
   useEffect(() => {
-    if (!sleep?.endsAt) return;
-    setNow(Date.now());
-    const id = setInterval(() => setNow(Date.now()), 500);
-    return () => clearInterval(id);
-  }, [sleep?.endsAt]);
-
-  const sleepRemaining = sleep?.endsAt ? Math.max(0, Math.ceil((sleep.endsAt - now) / 1000)) : null;
-  const fadeGain =
-    sleepRemaining == null ? 1 : Math.max(0, Math.min(1, sleepRemaining / SLEEP_FADE_SECONDS));
-
-  useEffect(() => {
-    if (sleepRemaining !== 0) return;
+    if (!p.sleepFired) return;
     try {
       player.pause();
     } catch {
       // not ready yet
     }
-    setSleepState(null);
-  }, [sleepRemaining, player]);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [p.sleepFired]);
 
   // Master volume, under the hearing ceiling, times the sleep fade.
   useEffect(() => {
@@ -121,7 +91,7 @@ export function TrackPlayerProvider({ children }: { children: React.ReactNode })
   }, [player, p.volume, fadeGain]);
 
   // "End of track" has to see the track end, so the loop is off while it is set.
-  const loop = repeat === 'one' && sleep?.id !== 'track';
+  const loop = repeat === 'one' && !endOfTrack;
   useEffect(() => {
     try {
       player.loop = loop;
@@ -219,8 +189,8 @@ export function TrackPlayerProvider({ children }: { children: React.ReactNode })
   // A track reaching its end without looping.
   useEffect(() => {
     if (!status.didJustFinish) return;
-    if (sleep?.id === 'track') {
-      setSleepState(null);
+    if (endOfTrack) {
+      p.setSleep(null);
       player.pause();
       player.seekTo(0).catch(() => {});
       return;
@@ -253,7 +223,7 @@ export function TrackPlayerProvider({ children }: { children: React.ReactNode })
   }, [current, status.playing, player, p]);
 
   const playFrom = useCallback(
-    (tracks: LibraryTrack[], id: string) => {
+    (tracks: LibraryTrack[], id: string, from = 'Sounds') => {
       if (current?.id === id) {
         toggle();
         return;
@@ -261,24 +231,17 @@ export function TrackPlayerProvider({ children }: { children: React.ReactNode })
       const i = tracks.findIndex((t) => t.id === id);
       if (i < 0) return;
       setQueue(tracks);
+      setContext(from);
       load(tracks, i);
     },
     [current?.id, toggle, load],
   );
 
-  const setSleep = useCallback((id: string | null) => {
-    const opt = SLEEP_OPTIONS.find((o) => o.id === id);
-    if (!opt) {
-      setSleepState(null);
-      return;
-    }
-    setSleepState({ id: opt.id, endsAt: opt.minutes ? Date.now() + opt.minutes * 60_000 : null });
-  }, []);
-
   const value = useMemo<Ctx>(
     () => ({
       current,
       queue,
+      context,
       playing: status.playing,
       buffering: status.isBuffering && !status.playing,
       playFrom,
@@ -290,13 +253,12 @@ export function TrackPlayerProvider({ children }: { children: React.ReactNode })
       },
       shuffle,
       toggleShuffle: () => setShuffle((s) => !s),
+      setShuffle,
       repeat,
       cycleRepeat: () => setRepeat((r) => (r === 'off' ? 'all' : r === 'all' ? 'one' : 'off')),
-      sleep: sleep?.id ?? null,
-      sleepRemaining,
-      setSleep,
+      setRepeat,
     }),
-    [current, queue, status.playing, status.isBuffering, playFrom, toggle, next, prev, player, shuffle, repeat, sleep?.id, sleepRemaining, setSleep],
+    [current, queue, context, status.playing, status.isBuffering, playFrom, toggle, next, prev, player, shuffle, repeat],
   );
 
   const progress = useMemo<Progress>(

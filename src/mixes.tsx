@@ -16,11 +16,20 @@ import AsyncStorage from '@react-native-async-storage/async-storage';
 const KEY = 'mixes.v1';
 
 export type MixLayer = {
-  /** A sound id from the library (`SOUNDS`). */
+  /** The sound's id in Supabase `sounds` (older mixes may hold a built-in id). */
   id: string;
   /** 0-100. */
   vol: number;
   on: boolean;
+  /*
+    A copy of what the layer needs to play and to be shown, taken when it was
+    added. A saved mix then plays straight away without waiting for the
+    library to load, and still shows its name if the sound is later removed
+    from the dashboard.
+  */
+  name?: string;
+  url?: string;
+  icon?: string;
 };
 
 export type SavedMix = {

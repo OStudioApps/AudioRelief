@@ -124,28 +124,24 @@ export const DEFAULT_LAYER_ON: Record<string, boolean> = {
 export const soundById = (id: string): Sound | undefined => SOUNDS.find((s) => s.id === id);
 
 /**
- * Three lengths: a short reset, an evening, and most of a night.
+ * The one sleep timer, for everything the player can play.
  *
- * `seconds` is the real duration the player counts down, and `fadeSeconds` the
- * tail it spends easing the volume to nothing. These used to be fixed strings
- * ("Stops in 57:40") that never moved — the screen promised a timer the app did
- * not have.
+ * `fadeSeconds` is the tail spent easing the volume to nothing, so the room
+ * goes quiet instead of cutting out — longer for longer timers, because
+ * someone who set three hours is asleep and a sudden stop could wake them.
+ * "End of track" only means something for a library track; a loop has no end.
  */
-export const TIMERS = [
-  { id: '15m', label: '15 min', seconds: 15 * 60, fadeSeconds: 3 * 60, fade: 'Fades over the last 3 min' },
-  { id: '1h', label: '1 hour', seconds: 60 * 60, fadeSeconds: 5 * 60, fade: 'Fades over the last 5 min' },
-  { id: '3h', label: '3 hours', seconds: 3 * 60 * 60, fadeSeconds: 10 * 60, fade: 'Fades over the last 10 min' },
-] as const;
+export type SleepOption = { id: string; label: string; minutes?: number; fadeSeconds: number };
 
-/** m:ss under an hour, h:mm:ss over it. */
-export function formatDuration(totalSeconds: number): string {
-  const s = Math.max(0, Math.round(totalSeconds));
-  const h = Math.floor(s / 3600);
-  const m = Math.floor((s % 3600) / 60);
-  const sec = s % 60;
-  const pad = (n: number) => String(n).padStart(2, '0');
-  return h > 0 ? `${h}:${pad(m)}:${pad(sec)}` : `${m}:${pad(sec)}`;
-}
+export const SLEEP_OPTIONS: SleepOption[] = [
+  { id: '15', label: '15 minutes', minutes: 15, fadeSeconds: 90 },
+  { id: '30', label: '30 minutes', minutes: 30, fadeSeconds: 2 * 60 },
+  { id: '45', label: '45 minutes', minutes: 45, fadeSeconds: 3 * 60 },
+  { id: '60', label: '1 hour', minutes: 60, fadeSeconds: 5 * 60 },
+  { id: '120', label: '2 hours', minutes: 120, fadeSeconds: 8 * 60 },
+  { id: '180', label: '3 hours', minutes: 180, fadeSeconds: 10 * 60 },
+  { id: 'track', label: 'End of track', fadeSeconds: 0 },
+];
 
 /**
  * Channels: different recordings of the same subject, so a forest can be

@@ -2,7 +2,7 @@ import React, { useEffect } from 'react';
 import { usePathname } from 'expo-router';
 import { setAudioModeAsync, useAudioPlayer } from 'expo-audio';
 import { usePlayer } from '../state';
-import { gainFor, isPlayable, SOUND_ASSETS } from './assets';
+import { gainFor, SOUND_ASSETS } from './assets';
 
 /**
  * The sound engine: one looping voice per active mix layer.
@@ -34,9 +34,21 @@ const FIRST_RUN = [
   '/auth',
 ];
 
-/** One looping layer. A component per voice, since hooks cannot run in a loop. */
-function Voice({ id, gain, playing }: { id: string; gain: number; playing: boolean }) {
-  const player = useAudioPlayer(SOUND_ASSETS[id]);
+/**
+ * One looping layer. A component per voice, since hooks cannot run in a loop.
+ * The source is either a bundled file or a sound streamed from Supabase.
+ * Exported for the mix editor, which previews a mix with the same voices.
+ */
+export function LoopVoice({
+  source,
+  gain,
+  playing,
+}: {
+  source: number | { uri: string };
+  gain: number;
+  playing: boolean;
+}) {
+  const player = useAudioPlayer(source);
 
   useEffect(() => {
     try {
@@ -85,7 +97,8 @@ export function SoundEngine() {
   const p = usePlayer();
   const pathname = usePathname();
   const allowed = !FIRST_RUN.includes(pathname);
-  const voices = allowed ? p.mixLayers.filter(isPlayable) : [];
+  const sourceOf = (id: string) => SOUND_ASSETS[id] ?? (p.layerSrc[id] ? { uri: p.layerSrc[id] } : null);
+  const voices = allowed ? p.mixLayers.filter((id) => sourceOf(id) != null) : [];
   const anyPlaying = allowed && p.playing && voices.length > 0;
 
   useEffect(() => {
@@ -102,9 +115,9 @@ export function SoundEngine() {
   return (
     <>
       {voices.map((id) => (
-        <Voice
+        <LoopVoice
           key={id}
-          id={id}
+          source={sourceOf(id)!}
           // The sleep timer's tail rides on top of the master volume, so the
           // last minutes ease away without the slider appearing to move.
           gain={p.layerOn[id] === false ? 0 : gainFor(p.volume * p.fadeGain, p.layerVol[id] ?? 50)}

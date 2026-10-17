@@ -1,6 +1,7 @@
 import { useEffect, useRef } from 'react';
 import { useHistory } from '../history';
 import { usePlayer } from '../state';
+import { useTrackPlayer } from './tracks';
 
 /**
  * Writes a line in the history every time a stretch of listening ends.
@@ -71,6 +72,68 @@ export function SessionRecorder() {
   }, [p.selection.id]);
 
   // A session in progress when the app tears down still counts.
+  useEffect(() => flush, []);
+
+  return <TrackRecorder />;
+}
+
+/** History ids for library tracks carry this prefix, so they never collide with sound or mix ids. */
+export const TRACK_SESSION_PREFIX = 'track:';
+
+/**
+ * The same bookkeeping for library tracks, which play through their own
+ * engine. Split out rather than folded into the effects above: the two
+ * engines start and stop independently, and one timeline per engine keeps
+ * either from closing the other's session by accident.
+ */
+function TrackRecorder() {
+  const tp = useTrackPlayer();
+  const p = usePlayer();
+  const { logSession } = useHistory();
+
+  const startedAt = useRef<number | null>(null);
+  const current = useRef<{ id: string; name: string } | null>(null);
+  const volume = useRef(p.volume);
+  volume.current = p.volume;
+  const logRef = useRef(logSession);
+  logRef.current = logSession;
+
+  const flush = () => {
+    const start = startedAt.current;
+    const what = current.current;
+    startedAt.current = null;
+    current.current = null;
+    if (start == null || !what) return;
+    logRef.current({
+      at: new Date(start).toISOString(),
+      seconds: Math.round((Date.now() - start) / 1000),
+      id: what.id,
+      name: what.name,
+      volume: volume.current,
+    });
+  };
+
+  const open = () => {
+    if (!tp.current) return;
+    startedAt.current = Date.now();
+    current.current = { id: TRACK_SESSION_PREFIX + tp.current.id, name: tp.current.title };
+  };
+
+  useEffect(() => {
+    if (tp.playing) open();
+    else flush();
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [tp.playing]);
+
+  // Skipping to the next track mid-play closes one session and opens the next.
+  useEffect(() => {
+    if (!tp.playing || !tp.current) return;
+    if (current.current?.id === TRACK_SESSION_PREFIX + tp.current.id) return;
+    flush();
+    open();
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [tp.current?.id]);
+
   useEffect(() => flush, []);
 
   return null;
