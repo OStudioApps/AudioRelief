@@ -3,6 +3,8 @@ import { View, ViewStyle } from 'react-native';
 import {
   Alarm,
   ArrowClockwise,
+  ArrowDown,
+  ArrowUp,
   Bed,
   BellSlash,
   Brain,
@@ -98,6 +100,8 @@ const ICONS: Record<string, PhosphorIcon> = {
   close: X,
   check: Check,
   refresh: ArrowClockwise,
+  arrowUp: ArrowUp,
+  arrowDown: ArrowDown,
   volume: SpeakerNone,
   volumeLow: SpeakerLow,
   volumeHigh: SpeakerHigh,

@@ -1,9 +1,13 @@
-import React, { useMemo, useState } from 'react';
+import React, { useCallback, useEffect, useMemo, useState } from 'react';
 import { ActivityIndicator, Modal, Pressable, ScrollView, StyleSheet, Text, View } from 'react-native';
 import { BlurView } from 'expo-blur';
+import { useAudioPlayer, useAudioPlayerStatus } from 'expo-audio';
 import { LinearGradient } from 'expo-linear-gradient';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { categoriesOf, type MixerSound, mixerSoundColors, useMixerSounds } from '../data/mixerSounds';
+import { gainFor } from '../audio/assets';
+import { useTrackPlayer } from '../audio/tracks';
+import { usePlayer } from '../state';
 import { color, font, radius, safe, type as t } from '../theme';
 import { Chip, RoundButton } from './Glass';
 import { PressScale } from './Motion';
@@ -14,17 +18,29 @@ import { SoundIcon } from './SoundIcon';
  * The sound library, for adding a layer to the mix — the sounds managed on the
  * dashboard, in its categories. Sounds already in the mix are listed as taken
  * rather than hidden, so the catalogue does not appear to shrink as you build.
+ *
+ * Tapping a sound plays it, the way picking a song for a story works: you
+ * hear it before you commit, and tapping it again (or another one) stops it.
+ * Only the + adds it. Before, a tap added the sound and closed the sheet, so
+ * the only way to find out what "Laundry Room" sounded like was to put it in
+ * the mix and take it out again.
  */
+
+/** The level a sound is added at in the mix editor, so the preview sounds like the result. */
+const PREVIEW_LAYER_VOLUME = 60;
 export function AddSoundSheet({
   visible,
   inMix,
   onAdd,
   onClose,
+  onPreviewChange,
 }: {
   visible: boolean;
   inMix: string[];
   onAdd: (sound: MixerSound) => void;
   onClose: () => void;
+  /** Told when a preview starts and stops, so the screen behind can go quiet meanwhile. */
+  onPreviewChange?: (previewing: boolean) => void;
 }) {
   const insets = useSafeAreaInsets();
   const [cat, setCat] = useState<string>('all');
@@ -34,6 +50,55 @@ export function AddSoundSheet({
   const chips = [{ id: 'all', label: 'All' }, ...categories.map((c) => ({ id: c.id, label: c.name }))];
 
   const list = cat === 'all' ? sounds : sounds.filter((s) => s.category?.id === cat);
+
+  // One preview voice for the whole sheet: starting one sound replaces the
+  // last, so two can never play over each other.
+  const p = usePlayer();
+  const tp = useTrackPlayer();
+  const preview = useAudioPlayer(undefined);
+  const status = useAudioPlayerStatus(preview);
+  const [previewId, setPreviewId] = useState<string | null>(null);
+  // Streamed from storage, so there is a moment between the tap and the sound.
+  const buffering = previewId !== null && !status.playing;
+
+  const stopPreview = useCallback(() => {
+    try {
+      preview.pause();
+    } catch {
+      // nothing loaded yet
+    }
+    setPreviewId(null);
+  }, [preview]);
+
+  const togglePreview = (s: MixerSound) => {
+    if (previewId === s.id) {
+      stopPreview();
+      return;
+    }
+    // Whatever else is sounding steps aside, so the sound is heard on its own.
+    if (p.playing) p.togglePlay();
+    if (tp.playing) tp.toggle();
+    try {
+      preview.replace({ uri: s.url });
+      preview.loop = true;
+      // Through the master volume and the hearing ceiling, like every other voice.
+      preview.volume = gainFor(p.volume, PREVIEW_LAYER_VOLUME);
+      Promise.resolve(preview.play()).catch(() => {});
+      setPreviewId(s.id);
+    } catch {
+      setPreviewId(null);
+    }
+  };
+
+  // Closing the sheet, by any route, ends the preview.
+  useEffect(() => {
+    if (!visible) stopPreview();
+  }, [visible, stopPreview]);
+
+  useEffect(() => {
+    onPreviewChange?.(previewId !== null);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [previewId]);
 
   return (
     <Modal visible={visible} transparent animationType="slide" onRequestClose={onClose}>
@@ -91,7 +156,7 @@ export function AddSoundSheet({
                   Add a sound
                 </Text>
                 <Text style={[t.meta, { color: color.ink58 }]}>
-                  {inMix.length} in your mix · {sounds.length} sounds in the library
+                  Tap a sound to hear it · + to add it
                 </Text>
               </View>
               <RoundButton onPress={onClose}>
@@ -151,62 +216,96 @@ export function AddSoundSheet({
               ) : null}
               {list.map((s) => {
                 const taken = inMix.includes(s.id);
+                const on = previewId === s.id;
                 return (
-                  <PressScale
+                  /*
+                    Two siblings, not a button inside a button: the row body
+                    plays the sound, the + beside it adds it. Nested
+                    pressables make invalid markup on web and leave which tap
+                    wins to propagation.
+                  */
+                  <View
                     key={s.id}
-                    disabled={taken}
-                    accessibilityRole="button"
-                    accessibilityLabel={taken ? `${s.title}, already in your mix` : `Add ${s.title}`}
-                    accessibilityState={{ disabled: taken }}
-                    onPress={() => {
-                      onAdd(s);
-                      onClose();
-                    }}
                     style={{
                       minHeight: 64,
                       flexDirection: 'row',
                       alignItems: 'center',
-                      gap: 13,
-                      paddingHorizontal: 14,
-                      paddingVertical: 10,
                       borderRadius: radius.md,
-                      backgroundColor: 'rgba(255,255,255,0.045)',
+                      backgroundColor: on ? 'rgba(95,224,210,0.08)' : 'rgba(255,255,255,0.045)',
                       borderWidth: 1,
-                      borderColor: color.glassBorder,
+                      borderColor: on ? color.accent : color.glassBorder,
                       opacity: taken ? 0.4 : 1,
                     }}
                   >
-                    <LinearGradient
-                      colors={mixerSoundColors(s.id)}
-                      start={{ x: 0.1, y: 0 }}
-                      end={{ x: 1, y: 1 }}
-                      style={{ width: 38, height: 38, borderRadius: radius.xs, alignItems: 'center', justifyContent: 'center' }}
+                    <PressScale
+                      disabled={taken}
+                      onPress={() => togglePreview(s)}
+                      accessibilityRole="button"
+                      accessibilityLabel={
+                        taken ? `${s.title}, already in your mix` : on ? `Stop ${s.title}` : `Play ${s.title}`
+                      }
+                      accessibilityState={{ disabled: taken, selected: on }}
+                      style={{
+                        flex: 1,
+                        flexDirection: 'row',
+                        alignItems: 'center',
+                        gap: 13,
+                        paddingLeft: 14,
+                        paddingVertical: 10,
+                      }}
                     >
-                      <SoundIcon name={s.icon} size={18} color="rgba(255,255,255,0.85)" />
-                    </LinearGradient>
-                    <View style={{ flex: 1, gap: 2 }}>
-                      <Text style={[t.card, { color: color.ink, fontSize: 14.5 }]} numberOfLines={1}>
-                        {s.title}
-                      </Text>
-                      <Text style={[t.meta, { color: color.ink58 }]}>{s.category?.name ?? 'Sound'} · loops</Text>
-                    </View>
-                    {taken ? (
-                      <Text style={[t.meta, { color: color.ink58 }]}>In mix</Text>
-                    ) : (
-                      <View
-                        style={{
-                          width: 32,
-                          height: 32,
-                          borderRadius: 16,
-                          alignItems: 'center',
-                          justifyContent: 'center',
-                          backgroundColor: 'rgba(255,255,255,0.09)',
-                        }}
+                      <LinearGradient
+                        colors={mixerSoundColors(s.id)}
+                        start={{ x: 0.1, y: 0 }}
+                        end={{ x: 1, y: 1 }}
+                        style={{ width: 38, height: 38, borderRadius: radius.xs, alignItems: 'center', justifyContent: 'center' }}
                       >
-                        <Icon name="plus" size={16} color={color.accent} strokeWidth={2} />
+                        {on && buffering ? (
+                          <ActivityIndicator size="small" color="#fff" />
+                        ) : on ? (
+                          <Icon name="pause" size={16} color="#fff" />
+                        ) : (
+                          <SoundIcon name={s.icon} size={18} color="rgba(255,255,255,0.85)" />
+                        )}
+                      </LinearGradient>
+                      <View style={{ flex: 1, gap: 2 }}>
+                        <Text style={[t.card, { color: color.ink, fontSize: 14.5 }]} numberOfLines={1}>
+                          {s.title}
+                        </Text>
+                        <Text style={[t.meta, { color: on ? color.accent : color.ink58 }]} numberOfLines={1}>
+                          {on ? (buffering ? 'Loading…' : 'Playing · tap to stop') : `${s.category?.name ?? 'Sound'} · loops`}
+                        </Text>
                       </View>
+                    </PressScale>
+                    {taken ? (
+                      <Text style={[t.meta, { color: color.ink58, paddingHorizontal: 14 }]}>In mix</Text>
+                    ) : (
+                      <PressScale
+                        onPress={() => {
+                          stopPreview();
+                          onAdd(s);
+                          onClose();
+                        }}
+                        accessibilityRole="button"
+                        accessibilityLabel={`Add ${s.title} to the mix`}
+                        scaleTo={0.88}
+                        style={{ width: 56, alignSelf: 'stretch', alignItems: 'center', justifyContent: 'center' }}
+                      >
+                        <View
+                          style={{
+                            width: 34,
+                            height: 34,
+                            borderRadius: 17,
+                            alignItems: 'center',
+                            justifyContent: 'center',
+                            backgroundColor: on ? color.accent : 'rgba(255,255,255,0.09)',
+                          }}
+                        >
+                          <Icon name="plus" size={16} color={on ? color.onAccent : color.accent} strokeWidth={2.2} />
+                        </View>
+                      </PressScale>
                     )}
-                  </PressScale>
+                  </View>
                 );
               })}
             </ScrollView>

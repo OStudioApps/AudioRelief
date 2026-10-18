@@ -18,6 +18,14 @@ import { useAdminMixes } from '../src/data/adminMixes';
 import { usePlayer } from '../src/state';
 import { color, glow, motion, radius, safe, space, type as t } from '../src/theme';
 
+/*
+  Explicit 100% alongside absoluteFill: a bundled image knows its own size,
+  and on web it renders at that natural size (900px) instead of filling the
+  tile, so a small artwork box showed only a zoomed-in corner of the picture.
+*/
+const ART_FILL = { width: '100%', height: '100%' } as const;
+
+
 /** A secondary transport control; `on` lights it and adds a dot under it, as music apps do. */
 function ModeButton({
   icon,
@@ -216,7 +224,7 @@ export default function Player() {
             >
               <LinearGradient colors={colors} start={{ x: 0.1, y: 0 }} end={{ x: 0.9, y: 1 }} style={StyleSheet.absoluteFill} />
               {np.art ? (
-                <Image source={np.art} style={StyleSheet.absoluteFill} resizeMode="cover" />
+                <Image source={np.art} style={[StyleSheet.absoluteFill, ART_FILL]} resizeMode="cover" />
               ) : (
                 <View style={[StyleSheet.absoluteFill, { alignItems: 'center', justifyContent: 'center' }]}>
                   <Icon name="waves" size={art * 0.28} color="rgba(255,255,255,0.75)" />

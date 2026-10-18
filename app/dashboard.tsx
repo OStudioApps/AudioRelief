@@ -358,19 +358,24 @@ export default function Dashboard() {
                       {trend.latest.value}
                       <Text style={{ fontSize: 18, color: color.ink58 }}> / 10</Text>
                     </Text>
-                    <Text
-                      style={[
-                        t.meta,
-                        {
-                          color: trend.change < 0 ? color.scaleGood : trend.change > 0 ? color.scaleMid : color.ink58,
-                          paddingBottom: 4,
-                        },
-                      ]}
-                    >
-                      {trend.change === 0
-                        ? 'unchanged'
-                        : `${trend.change < 0 ? '↓' : '↑'} ${Math.abs(trend.change)} since you started`}
-                    </Text>
+                    <View style={{ flexDirection: 'row', alignItems: 'center', gap: 3, paddingBottom: 4 }}>
+                      {trend.change === 0 ? null : (
+                        <Icon
+                          name={trend.change < 0 ? 'arrowDown' : 'arrowUp'}
+                          size={12}
+                          strokeWidth={2.2}
+                          color={trend.change < 0 ? color.scaleGood : color.scaleMid}
+                        />
+                      )}
+                      <Text
+                        style={[
+                          t.meta,
+                          { color: trend.change < 0 ? color.scaleGood : trend.change > 0 ? color.scaleMid : color.ink58 },
+                        ]}
+                      >
+                        {trend.change === 0 ? 'unchanged' : `${Math.abs(trend.change)} since you started`}
+                      </Text>
+                    </View>
                   </View>
 
                   {/*

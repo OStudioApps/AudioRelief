@@ -1,6 +1,7 @@
 import { useCallback, useEffect, useState } from 'react';
 import { errorMessage, isSupabaseConfigured, supabase } from '../lib/supabase';
 import type { MixLayer } from '../mixes';
+import { categoryIcon } from '../components/SoundIcon';
 
 /**
  * Mixes made on the dashboard's Mixes page, for everyone using the app.
@@ -22,14 +23,20 @@ type Row = {
   name: string;
   mixer_preset_layers: Array<{
     volume: number;
-    sounds: { id: string; title: string; file_url: string | null; icon: string | null; is_active: boolean } | null;
+    sounds: {
+      id: string;
+      title: string;
+      file_url: string | null;
+      is_active: boolean;
+      sound_categories: { name: string } | null;
+    } | null;
   }>;
 };
 
 async function fetchMixes(): Promise<AdminMix[]> {
   const { data, error } = await supabase
     .from('mixer_presets')
-    .select('id, name, mixer_preset_layers(volume, sounds(id, title, file_url, icon, is_active))')
+    .select('id, name, mixer_preset_layers(volume, sounds(id, title, file_url, is_active, sound_categories(name)))')
     .is('user_id', null)
     .eq('is_featured', true)
     .order('created_at', { ascending: false });
@@ -47,7 +54,8 @@ async function fetchMixes(): Promise<AdminMix[]> {
           on: true,
           name: l.sounds!.title,
           url: l.sounds!.file_url!,
-          icon: l.sounds!.icon ?? 'Waves',
+          // Same glyph as in the mixer library: the sound's category.
+          icon: categoryIcon(l.sounds!.sound_categories?.name),
         })),
     }))
     .filter((m) => m.layers.length > 0);

@@ -1,6 +1,7 @@
-import { useCallback, useEffect, useState } from 'react';
+import { useCallback, useEffect, useMemo, useState } from 'react';
 import { errorMessage, isSupabaseConfigured, supabase } from '../lib/supabase';
 import { trackColors } from './library';
+import { categoryIcon } from '../components/SoundIcon';
 
 /**
  * The mixer's sound library: the loopable sounds managed on the dashboard's
@@ -19,7 +20,7 @@ export type MixerSound = {
   id: string;
   title: string;
   url: string;
-  /** Phosphor name chosen on the dashboard; drawn by SoundIcon. */
+  /** Phosphor name for the sound's category (see categoryIcon); drawn by SoundIcon. */
   icon: string;
   category: MixerCategory | null;
 };
@@ -28,14 +29,13 @@ type Row = {
   id: string;
   title: string;
   file_url: string | null;
-  icon: string | null;
   sound_categories: MixerCategory | null;
 };
 
 async function fetchSounds(): Promise<MixerSound[]> {
   const { data, error } = await supabase
     .from('sounds')
-    .select('id, title, file_url, icon, sound_categories(id, name, sort_order)')
+    .select('id, title, file_url, sound_categories(id, name, sort_order)')
     .eq('is_active', true)
     .order('title', { ascending: true });
   if (error) throw error;
@@ -46,7 +46,9 @@ async function fetchSounds(): Promise<MixerSound[]> {
       id: r.id,
       title: r.title,
       url: r.file_url!,
-      icon: r.icon ?? 'Waves',
+      // The category's glyph rather than `r.icon`: every sound came in with
+      // the dashboard's default wave, so the stored icon said nothing.
+      icon: categoryIcon(r.sound_categories?.name),
       category: r.sound_categories,
     }));
 }
@@ -102,6 +104,16 @@ export function categoriesOf(sounds: MixerSound[]): MixerCategory[] {
   const seen = new Map<string, MixerCategory>();
   for (const s of sounds) if (s.category && !seen.has(s.category.id)) seen.set(s.category.id, s.category);
   return [...seen.values()].sort((a, b) => a.sort_order - b.sort_order || a.name.localeCompare(b.name));
+}
+
+/**
+ * Each library sound's icon by id. A saved mix copied its layers' icons when
+ * they were added — older ones hold the dashboard's default wave — so cards
+ * and the editor look the current one up here first.
+ */
+export function useLibraryIcons(): Map<string, string> {
+  const { sounds } = useMixerSounds();
+  return useMemo(() => new Map(sounds.map((s) => [s.id, s.icon])), [sounds]);
 }
 
 /** A stable gradient per sound, the same in the picker, the editor and on the mix card. */

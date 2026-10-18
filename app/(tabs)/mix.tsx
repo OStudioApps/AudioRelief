@@ -8,8 +8,8 @@ import { GlassCard, PrimaryButton, RoundButton } from '../../src/components/Glas
 import { Icon } from '../../src/components/Icon';
 import { PressScale } from '../../src/components/Motion';
 import { useTabClearance } from '../../src/components/MiniPlayer';
-import { artFor, soundById } from '../../src/data/sounds';
-import { mixerSoundColors } from '../../src/data/mixerSounds';
+import { artFor, mixArt, soundById } from '../../src/data/sounds';
+import { mixerSoundColors, useLibraryIcons } from '../../src/data/mixerSounds';
 import { SoundIcon } from '../../src/components/SoundIcon';
 import { SavedMix, useMixes } from '../../src/mixes';
 import { usePlayer } from '../../src/state';
@@ -27,8 +27,9 @@ import { color, font, glow, motion, radius, safe, space, type as t } from '../..
  */
 
 /** A saved mix as a card — the same shape as a sound card, so the app reads as one app. */
-function MixCard({ mix, onPlay, onEdit, playing }: {
+function MixCard({ mix, onPlay, onEdit, playing, iconById }: {
   mix: SavedMix;
+  iconById: Map<string, string>;
   onPlay: () => void;
   onEdit: () => void;
   playing: boolean;
@@ -54,7 +55,9 @@ function MixCard({ mix, onPlay, onEdit, playing }: {
   ];
   // Library sounds have no photographs; without panels, the card shows what
   // it is made of as the sounds' own icons instead.
-  const icons = mix.layers.slice(0, 4).map((l) => ({ key: l.id, name: l.icon ?? soundById(l.id)?.icon }));
+  const icons = mix.layers
+    .slice(0, 4)
+    .map((l) => ({ key: l.id, name: iconById.get(l.id) ?? l.icon ?? soundById(l.id)?.icon }));
   const count = mix.layers.length;
 
   return (
@@ -85,7 +88,7 @@ function MixCard({ mix, onPlay, onEdit, playing }: {
           colors={colors}
           start={{ x: 0.1, y: 0 }}
           end={{ x: 0.9, y: 1 }}
-          style={[StyleSheet.absoluteFill, { opacity: panels.length ? 0.35 : 1 }]}
+          style={[StyleSheet.absoluteFill, { opacity: 0.35 }]}
         />
 
         {/* The panels. A hairline of the ground colour between them, so the
@@ -113,7 +116,16 @@ function MixCard({ mix, onPlay, onEdit, playing }: {
               </View>
             ))}
           </View>
-        ) : null}
+        ) : (
+          // Built from the dashboard's sounds, which have no photographs:
+          // the mix wears its own abstract artwork, the same one it shows in
+          // the player.
+          <Image
+            source={mixArt(mix.id)}
+            style={[StyleSheet.absoluteFill, { width: '100%', height: '100%', opacity: 0.7 }]}
+            resizeMode="cover"
+          />
+        )}
         <LinearGradient
           colors={['rgba(7,10,22,0.22)', 'rgba(7,10,22,0.58)', 'rgba(7,10,22,0.94)'] as const}
           locations={[0, 0.5, 1]}
@@ -195,6 +207,7 @@ export default function Mixes() {
   const TAB_CLEARANCE = useTabClearance();
   const p = usePlayer();
   const { mixes, loaded } = useMixes();
+  const iconById = useLibraryIcons();
   const np = useNowPlaying();
 
   return (
@@ -277,6 +290,7 @@ export default function Mixes() {
                 <MixCard
                   key={m.id}
                   mix={m}
+                  iconById={iconById}
                   playing={np.kind !== 'track' && p.selection.id === m.id && p.playing}
                   onPlay={() => {
                     const fresh = p.selection.id !== m.id;

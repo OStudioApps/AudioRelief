@@ -94,6 +94,28 @@ export const SOUND_ART: Record<string, number> = {
 export const artFor = (id: string): number | null =>
   MIX_ART[id]?.image ?? SOUND_ART[id] ?? null;
 
+/**
+ * Artwork for a mix made of the dashboard's sounds — one the person built,
+ * or one published from the dashboard. Those sounds carry no photographs, so
+ * the mix would otherwise be a flat gradient on its card and an empty tile in
+ * the player. Four abstract wave images instead — layered lines, which is
+ * what a mix is — and the mix's id picks one, so the same mix always looks
+ * the same everywhere and a shelf of them is not one picture repeated.
+ * Sources: assets/mixes/README.md.
+ */
+const MIX_ABSTRACT_ART: number[] = [
+  require('../../assets/mixes/abstract-1.jpg'),
+  require('../../assets/mixes/abstract-2.jpg'),
+  require('../../assets/mixes/abstract-3.jpg'),
+  require('../../assets/mixes/abstract-4.jpg'),
+];
+
+export function mixArt(mixId: string): number {
+  let h = 0;
+  for (let i = 0; i < mixId.length; i++) h = (h * 31 + mixId.charCodeAt(i)) >>> 0;
+  return MIX_ABSTRACT_ART[h % MIX_ABSTRACT_ART.length];
+}
+
 export const MIXES: Mix[] = [
   { id: 'rain', name: 'Rain on a tin roof', sub: '3 layers · 45 min', fade: 'Fades out at 45 min', colors: c('rain') },
   { id: 'ocean', name: 'Deep ocean hum', sub: '3 layers · all night', fade: 'Plays until your alarm', colors: c('ocean') },

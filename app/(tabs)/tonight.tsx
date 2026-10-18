@@ -16,7 +16,7 @@ import { playlistMeta, usePlaylists } from '../../src/data/playlists';
 import { recommendTracks } from '../../src/data/recommendTracks';
 import { PlaylistCover } from '../../src/components/PlaylistCover';
 import { useTinnitus } from '../../src/tinnitus';
-import { NOISES, soundById } from '../../src/data/sounds';
+import { NOISES, mixArt, soundById } from '../../src/data/sounds';
 import { type AdminMix, soundCount, useAdminMixes } from '../../src/data/adminMixes';
 import { mixerSoundColors } from '../../src/data/mixerSounds';
 import { SoundIcon } from '../../src/components/SoundIcon';
@@ -415,7 +415,8 @@ export default function Home() {
         subtitle: `${soundCount(idleMix.layers.length)} · AudioRelief mix`,
         playing: false,
         tint: mixerSoundColors(idleMix.layers[0].id)[0],
-        art: null,
+        // The picture it will have in the player once it starts.
+        art: mixArt(idleMix.id),
         toggle: () => playAdminMix(idleMix),
         open: () => {
           playAdminMix(idleMix);
@@ -728,11 +729,17 @@ export default function Home() {
                   borderColor: on ? color.accent : color.glassBorder,
                 }}
               >
-                {/* The first sound's colour, held back so the card stays dark glass. */}
+                {/* The mix's artwork — the same picture the player shows while
+                    it plays — under a scrim that keeps the name readable. */}
+                <Image
+                  source={mixArt(m.id)}
+                  style={[StyleSheet.absoluteFill, { width: '100%', height: '100%', opacity: 0.62 }]}
+                  resizeMode="cover"
+                />
                 <LinearGradient
-                  colors={[rgba(tint[0], 0.28), rgba(tint[1], 0.08)]}
+                  colors={[rgba(tint[0], 0.18), 'rgba(7,10,22,0.86)']}
                   start={{ x: 0, y: 0 }}
-                  end={{ x: 1, y: 1 }}
+                  end={{ x: 0, y: 1 }}
                   style={StyleSheet.absoluteFill}
                 />
                 <View style={{ flex: 1, padding: 13, justifyContent: 'space-between' }}>
@@ -789,29 +796,39 @@ export default function Home() {
           </PressScale>
         </ScrollView>
 
-        <View style={{ height: 22 }} />
+        {/*
+          Steady noise is the tinnitus tool — broadband sound pitched to sit
+          under the ringing — so it is shown only to people the survey says
+          have tinnitus. Someone here to relax gets the mixes and the
+          library; the noises are still in the mixer, under Noise.
+        */}
+        {tin.loaded && (tin.hasTinnitus === true || tin.hasProfile) ? (
+          <>
+            <View style={{ height: 22 }} />
 
-        <SectionLabel>Steady noise</SectionLabel>
+            <SectionLabel>Steady noise</SectionLabel>
 
-        <View style={{ height: 10 }} />
+            <View style={{ height: 10 }} />
 
-        <View style={{ flexDirection: 'row', gap: 10 }}>
-          {NOISES.map((n) => {
-            const on = onLoop && p.selection.kind === 'noise' && p.selection.id === n.id;
-            const suggested = tin.hasProfile && n.id === pick.id;
-            return (
-              <NoiseTile
-                key={n.id}
-                name={n.name}
-                colors={n.colors as unknown as readonly [string, string]}
-                selected={on}
-                playing={on && p.playing}
-                suggested={suggested}
-                onPress={() => playNoise(n.id)}
-              />
-            );
-          })}
-        </View>
+            <View style={{ flexDirection: 'row', gap: 10 }}>
+              {NOISES.map((n) => {
+                const on = onLoop && p.selection.kind === 'noise' && p.selection.id === n.id;
+                const suggested = tin.hasProfile && n.id === pick.id;
+                return (
+                  <NoiseTile
+                    key={n.id}
+                    name={n.name}
+                    colors={n.colors as unknown as readonly [string, string]}
+                    selected={on}
+                    playing={on && p.playing}
+                    suggested={suggested}
+                    onPress={() => playNoise(n.id)}
+                  />
+                );
+              })}
+            </View>
+          </>
+        ) : null}
 
         {tin.loaded && tin.hasProfile ? (
           <>
