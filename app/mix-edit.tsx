@@ -18,7 +18,7 @@ import { Icon } from '../src/components/Icon';
 import { SoundIcon } from '../src/components/SoundIcon';
 import { PressScale } from '../src/components/Motion';
 import { soundById } from '../src/data/sounds';
-import { mixerSoundColors } from '../src/data/mixerSounds';
+import { mixerSoundColors, useLibraryIcons } from '../src/data/mixerSounds';
 import { useAdminMixes } from '../src/data/adminMixes';
 import { gainFor, SOUND_ASSETS } from '../src/audio/assets';
 import { LoopVoice } from '../src/audio/engine';
@@ -48,11 +48,11 @@ const DEFAULT_LAYER_VOLUME = 60;
 const sourceOf = (l: MixLayer) => (l.url ? { uri: l.url } : (SOUND_ASSETS[l.id] ?? null));
 
 /** How a layer is shown. Saved layers carry their own name; older ones fall back to the built-in list. */
-function describe(l: MixLayer) {
+function describe(l: MixLayer, iconById: Map<string, string>) {
   const legacy = soundById(l.id);
   return {
     name: l.name ?? legacy?.name ?? 'Sound',
-    icon: l.icon ?? legacy?.icon ?? 'Waves',
+    icon: iconById.get(l.id) ?? l.icon ?? legacy?.icon ?? 'Waves',
     colors: (legacy?.colors as unknown as readonly [string, string] | undefined) ?? mixerSoundColors(l.id),
   };
 }
@@ -87,6 +87,7 @@ export default function MixEdit() {
   // of a dashboard mix ("Make it yours") — saving never touches the original.
   const { id, from } = useLocalSearchParams<{ id?: string; from?: string }>();
   const { byId, save, remove } = useMixes();
+  const iconById = useLibraryIcons();
   const { mixes: appMixes } = useAdminMixes();
 
   const existing = id ? byId(id) : undefined;
@@ -117,7 +118,10 @@ export default function MixEdit() {
     button silences everything at once without losing the sounds.
   */
   const [listening, setListening] = useState(true);
-  const audible = listening && layers.some((l) => sourceOf(l) != null);
+  // While a sound is being tried in the picker the mix steps back, so the
+  // candidate is heard on its own; it comes back when the preview stops.
+  const [auditioning, setAuditioning] = useState(false);
+  const audible = listening && !auditioning && layers.some((l) => sourceOf(l) != null);
   const p = usePlayer();
   const tp = useTrackPlayer();
 
@@ -223,7 +227,7 @@ export default function MixEdit() {
               </View>
 
               {layers.map((l) => {
-                const s = describe(l);
+                const s = describe(l, iconById);
                 const silent = sourceOf(l) == null;
                 return (
                   <GlassCard key={l.id} style={{ padding: 14, opacity: l.on ? 1 : 0.52 }}>
@@ -374,6 +378,7 @@ export default function MixEdit() {
           );
         }}
         onClose={() => setPicking(false)}
+        onPreviewChange={setAuditioning}
       />
     </View>
   );

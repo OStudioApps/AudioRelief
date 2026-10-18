@@ -11,6 +11,14 @@ import { color, radius, safe, type as t } from '../theme';
 import { Icon } from './Icon';
 import { PressScale } from './Motion';
 
+/*
+  Explicit 100% alongside absoluteFill: a bundled image knows its own size,
+  and on web it renders at that natural size (900px) instead of filling the
+  tile, so a small artwork box showed only a zoomed-in corner of the picture.
+*/
+const ART_FILL = { width: '100%', height: '100%' } as const;
+
+
 /** The tab bar's own height and the gap the mini player keeps above it. */
 const TAB_BAR_H = 64;
 const GAP = 8;
@@ -99,7 +107,7 @@ export function MiniPlayer({ aboveTabBar = true }: { aboveTabBar?: boolean }) {
             <View style={{ width: 42, height: 42, borderRadius: radius.xs - 2, overflow: 'hidden' }}>
               <LinearGradient colors={colors} start={{ x: 0.1, y: 0 }} end={{ x: 0.9, y: 1 }} style={StyleSheet.absoluteFill} />
               {np.art ? (
-                <Image source={np.art} style={StyleSheet.absoluteFill} resizeMode="cover" />
+                <Image source={np.art} style={[StyleSheet.absoluteFill, ART_FILL]} resizeMode="cover" />
               ) : (
                 <View style={[StyleSheet.absoluteFill, { alignItems: 'center', justifyContent: 'center' }]}>
                   <Icon name="waves" size={18} color="rgba(255,255,255,0.8)" />
@@ -111,10 +119,14 @@ export function MiniPlayer({ aboveTabBar = true }: { aboveTabBar?: boolean }) {
               <Text style={[t.card, { color: color.ink, fontSize: 14 }]} numberOfLines={1}>
                 {np.title}
               </Text>
-              <Text style={[t.meta, { color: color.ink62 }]} numberOfLines={1}>
-                {p.sleep ? <Text style={{ color: color.accent }}>{'☾ '}</Text> : null}
-                {np.subtitle}
-              </Text>
+              {/* The timer mark is the same Phosphor glyph as the sleep timer
+                  button, not a text moon that each font draws differently. */}
+              <View style={{ flexDirection: 'row', alignItems: 'center', gap: 4 }}>
+                {p.sleep ? <Icon name="sleepTimer" size={12} color={color.accent} /> : null}
+                <Text style={[t.meta, { color: color.ink62, flexShrink: 1 }]} numberOfLines={1}>
+                  {np.subtitle}
+                </Text>
+              </View>
             </View>
           </Pressable>
 

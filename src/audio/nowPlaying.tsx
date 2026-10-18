@@ -1,6 +1,6 @@
 import React, { createContext, useCallback, useContext, useEffect, useMemo, useState } from 'react';
 import type { ImageSourcePropType } from 'react-native';
-import { artFor } from '../data/sounds';
+import { artFor, mixArt } from '../data/sounds';
 import { type LibraryTrack, trackColors } from '../data/library';
 import { usePlayer } from '../state';
 import { useTrackPlayer } from './tracks';
@@ -135,7 +135,10 @@ export function NowPlayingProvider({ children }: { children: React.ReactNode }) 
       title: p.title,
       subtitle: p.subtitle,
       colors: p.colors,
-      art: artFor(p.artId),
+      // A mix of dashboard sounds — yours or one from the dashboard — has no
+      // photograph of its first sound to borrow; it shows the same abstract
+      // artwork as its card, in the mini player and the full player alike.
+      art: artFor(p.artId) ?? (p.selection.kind === 'mix' ? mixArt(p.selection.id) : null),
       context: loopContext,
       playing: p.playing,
       buffering: false,

@@ -25,3 +25,18 @@ Two caveats worth keeping in mind, from Unsplash's own terms:
 
 Each is 600px wide at quality 70, which covers the card at 3x. They are drawn
 at low opacity behind a scrim, so detail matters far less than tone.
+
+## Your own mixes
+
+A mix someone builds from the dashboard's sounds has no photograph of its own,
+so it wears one of four abstract wave images, picked from the mix's id — the
+same mix always gets the same one, and a shelf of mixes is not one picture
+repeated. Same licence as above (Unsplash License, free tier).
+
+- abstract-1.jpg  eybM9n4yrpE  blue light waves on black      Pawel Czerwinski
+- abstract-2.jpg  FnGZcsmeD2U  violet wave of light on black   A Chosen Soul
+- abstract-3.jpg  4vkaa4OvyCM  blue wave on black              Pawel Czerwinski
+- abstract-4.jpg  zft-W1kVEhg  layered blue wavy lines         SIMON LEE
+
+These are 900px wide at quality 72: they also fill the player's artwork and
+background, which is larger than a card.
